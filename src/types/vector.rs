@@ -1,0 +1,116 @@
+// SPDX-License-Identifier: MPL-2.0
+// SPDX-FileCopyrightText: 2025 sevonj
+
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
+use glam::Vec3;
+
+use crate::error::MgsError;
+use crate::util::*;
+
+/// 1:1 from disk
+/// 3D i32 vector
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(C)]
+pub struct Vector {
+    pub x: i32,
+    pub y: i32,
+    pub z: i32,
+}
+
+impl Vector {
+    pub fn from_le_unsized(buf: &[u8]) -> Result<Self, MgsError> {
+        check_fits_buf::<Self>(buf)?;
+        Self::from_le_bytes(buf[..size_of::<Self>()].try_into().unwrap())
+    }
+
+    pub fn from_le_bytes(buf: &[u8; size_of::<Self>()]) -> Result<Self, MgsError> {
+        Ok(Self {
+            x: read_i32_le_unchecked(buf, 0x0),
+            y: read_i32_le_unchecked(buf, 0x4),
+            z: read_i32_le_unchecked(buf, 0x8),
+        })
+    }
+
+    pub fn to_le_bytes(&self) -> [u8; size_of::<Self>()] {
+        let mut bytes = [0; size_of::<Self>()];
+        bytes[0x0..0x4].copy_from_slice(&self.x.to_le_bytes());
+        bytes[0x4..0x8].copy_from_slice(&self.y.to_le_bytes());
+        bytes[0x8..0xc].copy_from_slice(&self.z.to_le_bytes());
+        bytes
+    }
+}
+
+/// 1:1 from disk
+/// 3D i16 vector
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(C)]
+pub struct ShortVector {
+    pub x: i16,
+    pub y: i16,
+    pub z: i16,
+}
+
+impl ShortVector {
+    pub fn from_le_unsized(buf: &[u8]) -> Result<Self, MgsError> {
+        check_fits_buf::<Self>(buf)?;
+        Self::from_le_bytes(buf[..size_of::<Self>()].try_into().unwrap())
+    }
+
+    pub fn from_le_bytes(buf: &[u8; size_of::<Self>()]) -> Result<Self, MgsError> {
+        Ok(Self {
+            x: read_i16_le_unchecked(buf, 0x0),
+            y: read_i16_le_unchecked(buf, 0x2),
+            z: read_i16_le_unchecked(buf, 0x4),
+        })
+    }
+
+    pub fn to_le_bytes(&self) -> [u8; size_of::<Self>()] {
+        let mut bytes = [0; size_of::<Self>()];
+        bytes[0x0..0x2].copy_from_slice(&self.x.to_le_bytes());
+        bytes[0x2..0x4].copy_from_slice(&self.y.to_le_bytes());
+        bytes[0x4..0x6].copy_from_slice(&self.z.to_le_bytes());
+        bytes
+    }
+}
+
+impl Into<Vec3> for ShortVector {
+    fn into(self) -> Vec3 {
+        (&self).into()
+    }
+}
+
+impl Into<Vec3> for &ShortVector {
+    fn into(self) -> Vec3 {
+        Vec3 {
+            x: self.x as f32 / 1024.0,
+            y: self.y as f32 / 1024.0,
+            z: self.z as f32 / 1024.0,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_vector_size() {
+        assert_eq!(size_of::<Vector>(), 0x0c);
+    }
+
+    #[test]
+    fn test_aabb_cycle_bytes() {
+        let mut buf = vec![];
+        buf.extend_from_slice(&3_i32.to_le_bytes());
+        buf.extend_from_slice(&4_i32.to_le_bytes());
+        buf.extend_from_slice(&5_i32.to_le_bytes());
+        let vec = Vector::from_le_unsized(&buf).unwrap();
+        assert_eq!(buf, vec.to_le_bytes());
+    }
+}
