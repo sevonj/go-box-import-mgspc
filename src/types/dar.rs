@@ -6,6 +6,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+use std::fs::File;
 use std::path::Path;
 
 use crate::error::MgsError;

@@ -44,7 +44,7 @@ impl Kmd {
                 let d = face[0] as usize + base_v;
                 let vt_a = i * 4 + 3 + base_vt;
                 let vt_b = i * 4 + 2 + base_vt;
-                let vt_c: usize = i * 4 + 1 + base_vt;
+                let vt_c = i * 4 + 1 + base_vt;
                 let vt_d = i * 4 + 0 + base_vt;
                 out.push_str(&format!("f {a}/{vt_a} {b}/{vt_b} {c}/{vt_c} {d}/{vt_d}\n"));
             }

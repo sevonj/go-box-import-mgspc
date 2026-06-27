@@ -77,8 +77,8 @@ pub struct KmdUv([u8; 2]);
 impl Into<Vec2> for KmdUv {
     fn into(self) -> Vec2 {
         Vec2 {
-            x: self.0[0] as f32 / 1024.0,
-            y: self.0[1] as f32 / 1024.0,
+            x: self.0[0] as f32 / 256.0,
+            y: 1.0 - self.0[1] as f32 / 256.0,
         }
     }
 }
