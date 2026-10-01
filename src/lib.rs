@@ -1,4 +1,5 @@
 mod error;
+pub mod gobox_types;
 mod stage_info;
 mod types;
 mod util;

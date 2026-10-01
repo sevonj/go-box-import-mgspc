@@ -1,6 +1,5 @@
-use std::collections::BTreeMap;
-use std::collections::HashMap;
-
+use super::Kmd;
+use crate::types::KmdMesh;
 use glam::DVec3;
 use glam::Vec2;
 use glam::Vec3;
@@ -22,8 +21,8 @@ use gltf::json::mesh::Primitive;
 use gltf::json::mesh::Semantic;
 use gltf::json::validation::Checked;
 use gltf::mesh::Mode;
-
-use super::Kmd;
+use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 #[derive(Debug)]
 struct TempPrim {
@@ -35,7 +34,7 @@ struct TempPrim {
 }
 
 impl Kmd {
-    pub fn to_glb(&self) -> Vec<u8> {
+    pub fn to_glb(meshes: &[KmdMesh]) -> Vec<u8> {
         {
             let mut positions: Vec<Vec3> = vec![];
             let mut normals: Vec<Vec3> = vec![];
@@ -44,8 +43,14 @@ impl Kmd {
 
             let mut temp_meshes: Vec<Vec<TempPrim>> = vec![];
 
-            for mesh in &self.meshes {
-                let input_positions: Vec<Vec3> = mesh.vertices().iter().map(Into::into).collect();
+            for mesh in meshes {
+                let pos: Vec3 = mesh.header.pos.into();
+                let input_positions: Vec<Vec3> = mesh
+                    .vertices()
+                    .iter()
+                    .map(Into::into)
+                    .map(|p: Vec3| p + pos)
+                    .collect();
                 let input_normals: Vec<Vec3> = mesh.normals().iter().map(Into::into).collect();
                 let input_uvs: Vec<Vec2> = mesh.uvs().iter().map(Into::into).collect();
 

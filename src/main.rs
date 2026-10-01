@@ -3,22 +3,24 @@ mod stage_info;
 mod types;
 mod util;
 
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::fs::File;
-use std::io::Read;
-use std::path::Path;
-use std::path::PathBuf;
-
-use clap::Parser;
-use clap::ValueEnum;
-use image::ImageReader;
-use zip::ZipArchive;
-
 use crate::error::MgsError;
 use crate::stage_info::*;
 use crate::types::Darchive;
 use crate::types::Kmd;
+use crate::types::KmdMesh;
+use clap::Parser;
+use clap::ValueEnum;
+use glam::Vec3;
+use go_box_import_template::gobox_types::Coll;
+use image::ImageReader;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::fs::File;
+use std::io::Read;
+use std::io::Write;
+use std::path::Path;
+use std::path::PathBuf;
+use zip::ZipArchive;
 
 #[derive(Debug, ValueEnum, Clone, Copy)]
 enum ExportFormat {
@@ -56,49 +58,72 @@ fn main() {
     );
     let _ = std::fs::remove_dir_all(&out_dir);
 
-    let stage_path = game_dir.join("stage.mgz");
-    let extract_path = PathBuf::from(&out_dir).join("s00a");
+    let stage_mgz_path = game_dir.join("stage.mgz");
+    let temp_path = PathBuf::from(&out_dir).join("temp");
+    let out_stage_path = PathBuf::from(&out_dir).join("stages").join("shadmo");
 
-    let mut stage_zip = ZipArchive::new(File::open(&stage_path).unwrap()).unwrap();
+    let mut stage_zip = ZipArchive::new(File::open(&stage_mgz_path).unwrap()).unwrap();
 
-    std::fs::create_dir_all(&extract_path).unwrap();
+    std::fs::create_dir_all(&temp_path).unwrap();
+    std::fs::create_dir_all(&out_stage_path).unwrap();
+    File::create(&out_dir.join(".gdignore")).unwrap();
+    File::create(out_stage_path.join("manifest.json"))
+        .unwrap()
+        .write_all(include_str!("../extra-data/stage/manifest.json").as_bytes())
+        .unwrap();
+    let mut stage_merged = Vec::new();
 
-    extract_scenes(
-        &mut stage_zip,
-        &STAGE_S00A_TEXTURES,
-        &STAGE_S00A_MODELS,
-        &extract_path,
-        args.format,
-    );
+    for room in ROOMS.iter() {
+        extract_scenes(
+            &mut stage_zip,
+            room,
+            &mut stage_merged,
+            &temp_path,
+            args.format,
+        );
+    }
+    let coll = generate_coll(&stage_merged);
+    let mut coll_file = File::create(&out_stage_path.join("stage.coll")).unwrap();
+    coll.serialize(&mut coll_file).unwrap();
+    coll_file.flush().unwrap();
+
+    let glb_path = out_stage_path.join("stage.glb");
+    std::fs::write(&glb_path, Kmd::to_glb(&stage_merged)).unwrap();
 }
 
 fn extract_scenes(
     zip: &mut ZipArchive<File>,
-    tex_paks: &[&str],
-    mdl_paks: &[&str],
+    room: &MgsRoomInfo,
+    stage_merged: &mut Vec<KmdMesh>,
     extract_path: &Path,
     format: ExportFormat,
 ) {
     let mut tex_hashes = HashMap::new();
 
-    for name in tex_paks {
-        let archive = Darchive::read(&file_from_zip(zip, name), &mut 0).unwrap();
+    let room_extract_path = extract_path.join(room.name);
+    std::fs::create_dir_all(&room_extract_path).unwrap();
+
+    for filename in room.tex_paks {
+        let filepath = format!("stage/{}/{filename}", room.name);
+        let archive = Darchive::read(&file_from_zip(zip, &filepath), &mut 0).unwrap();
         collect_tex_hashes(&archive, &mut tex_hashes);
-        extract_textures(&archive, extract_path).unwrap();
+        extract_textures(&archive, &room_extract_path).unwrap();
     }
 
-    let mut models = vec![];
-    for name in mdl_paks {
-        let archive = Darchive::read(&file_from_zip(zip, name), &mut 0).unwrap();
+    let mut models = HashMap::new();
+    for filename in room.mdl_paks {
+        let filepath = format!("stage/{}/{filename}", room.name);
+        let archive = Darchive::read(&file_from_zip(zip, &filepath), &mut 0).unwrap();
 
         for file in archive.files() {
             let filename = file.name();
-            let extracted_filepath = extract_path.join(filename);
+            let extracted_filepath = room_extract_path.join(filename);
             if filename.ends_with(".kmd") {
-                models.push((
+                assert!(!models.contains_key(&extracted_filepath));
+                models.insert(
                     extracted_filepath,
                     Kmd::read(file.contents(), &mut 0).unwrap(),
-                ));
+                );
             }
         }
     }
@@ -121,7 +146,7 @@ fn extract_scenes(
         match format {
             ExportFormat::Glb => {
                 let glb_path = file_path.with_added_extension("glb");
-                std::fs::write(&glb_path, kmd.to_glb()).unwrap();
+                std::fs::write(&glb_path, Kmd::to_glb(kmd.meshes())).unwrap();
             }
             ExportFormat::Obj => {
                 let wavefront_path = file_path.with_added_extension("obj");
@@ -130,9 +155,43 @@ fn extract_scenes(
         }
     }
 
-    write_mtl(&mut tex_hashes, &extract_path.join("mats.mtl")).unwrap();
+    write_mtl(&mut tex_hashes, &room_extract_path.join("mats.mtl")).unwrap();
 
     println!("matches: {num_matches}/{num_textures}");
+
+    for filename in room.static_models {
+        stage_merged.extend(
+            models
+                .get(&room_extract_path.join(filename))
+                .unwrap()
+                .meshes()
+                .iter()
+                .cloned()
+                .map(|mut mesh| {
+                    mesh.header.pos += room.origin;
+                    mesh
+                }),
+        );
+    }
+
+    /*
+        let room_combined: Vec<KmdMesh> = room
+            .static_models
+            .iter()
+            .map(|filename| {
+                models
+                    .get(&room_extract_path.join(filename))
+                    .unwrap()
+                    .meshes()
+            })
+            .flatten()
+            .cloned()
+            .collect();
+        let glb_path = room_extract_path
+            .join("_room_combined")
+            .with_added_extension("glb");
+        std::fs::write(&glb_path, Kmd::to_glb(&room_combined)).unwrap();
+    */
 }
 
 fn file_from_zip(zip: &mut ZipArchive<File>, name: &str) -> Vec<u8> {
@@ -185,4 +244,27 @@ fn tex_hash(name: &str) -> u16 {
         v = v.wrapping_add(c as u16);
     }
     v
+}
+
+fn generate_coll(meshes: &[KmdMesh]) -> Coll {
+    let mut coll = Coll::default();
+    for mesh in meshes {
+        let pos: Vec3 = mesh.header().pos.into();
+        let vertices = mesh.vertices();
+        for face in mesh.vertex_faces() {
+            let a: Vec3 = vertices[face[0] as usize].into();
+            let b: Vec3 = vertices[face[1] as usize].into();
+            let c: Vec3 = vertices[face[2] as usize].into();
+            let d: Vec3 = vertices[face[3] as usize].into();
+
+            coll.vbuf.extend((a + pos).to_array());
+            coll.vbuf.extend((b + pos).to_array());
+            coll.vbuf.extend((c + pos).to_array());
+            coll.vbuf.extend((c + pos).to_array());
+            coll.vbuf.extend((d + pos).to_array());
+            coll.vbuf.extend((a + pos).to_array());
+            coll.num_tris += 2;
+        }
+    }
+    coll
 }

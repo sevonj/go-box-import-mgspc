@@ -6,8 +6,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-
 use glam::Vec3;
+use std::ops::AddAssign;
 
 use crate::error::MgsError;
 use crate::util::*;
@@ -42,6 +42,30 @@ impl Vector {
         bytes[0x4..0x8].copy_from_slice(&self.y.to_le_bytes());
         bytes[0x8..0xc].copy_from_slice(&self.z.to_le_bytes());
         bytes
+    }
+}
+
+impl AddAssign for Vector {
+    fn add_assign(&mut self, rhs: Self) {
+        self.x += rhs.x;
+        self.y += rhs.y;
+        self.z += rhs.z;
+    }
+}
+
+impl Into<Vec3> for Vector {
+    fn into(self) -> Vec3 {
+        (&self).into()
+    }
+}
+
+impl Into<Vec3> for &Vector {
+    fn into(self) -> Vec3 {
+        Vec3 {
+            x: self.x as f32 / 1024.0,
+            y: self.y as f32 / 1024.0,
+            z: self.z as f32 / 1024.0,
+        }
     }
 }
 

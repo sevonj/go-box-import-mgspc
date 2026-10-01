@@ -92,17 +92,17 @@ impl Into<Vec2> for &KmdUv {
 /// Deserialized kmd mesh entry
 #[derive(Debug, Clone)]
 pub struct KmdMesh {
-    header: KmdMeshHeader,
-    vertices: Vec<ShortVector>,
+    pub header: KmdMeshHeader,
+    pub vertices: Vec<ShortVector>,
     /// Indices for each face (every face is a quad)
-    vertex_faces: Vec<[u8; 4]>,
-    normals: Vec<ShortVector>,
+    pub vertex_faces: Vec<[u8; 4]>,
+    pub normals: Vec<ShortVector>,
     /// Normal indices for each face
-    normal_faces: Vec<[u8; 4]>,
+    pub normal_faces: Vec<[u8; 4]>,
     /// 4x per face
-    uvs: Vec<KmdUv>,
+    pub uvs: Vec<KmdUv>,
     /// per face
-    material_ids: Vec<u16>,
+    pub material_ids: Vec<u16>,
 }
 
 impl KmdMesh {
@@ -291,7 +291,7 @@ impl KmdMesh {
         self.normals.len()
     }
 
-    /*pub fn merged(&self, others: &[Self]) -> Self {
+    pub fn merge(&self, others: &[Self]) -> Self {
         let mut base_vertex = self.num_vertices();
         let mut base_face = self.num_faces();
         // let mut base_normal = self.num_normals();
@@ -301,26 +301,26 @@ impl KmdMesh {
         // let num_normals = base_normal + others.iter().map(Self::num_normals).sum::<usize>();
 
         let mut vertices = Vec::with_capacity(num_vertices);
-        let mut faces = Vec::with_capacity(num_faces);
+        // let mut faces = Vec::with_capacity(num_faces);
         // let mut normals = Vec::with_capacity(num_normals);
 
         vertices.extend_from_slice(&self.vertices);
-        faces.extend_from_slice(&self.faces);
+        //        faces.extend_from_slice(&self.faces);
         // normals.extend_from_slice(&self.normals);
 
         for other in others {
             vertices.extend_from_slice(other.vertices());
-            for face in other.faces(){
+            /*for face in other.faces(){
                 let mut face = face.clone();
                 for v in face{
                     v += base_vertex;
                 }
                 base_vertex += other.num_vertices();
-            }
+            }*/
         }
 
         todo!()
-    }*/
+    }
 }
 
 /// 1:1 from disk
@@ -328,22 +328,22 @@ impl KmdMesh {
 /// ptrs are relative to kmd file header
 #[derive(Debug, Clone)]
 pub struct KmdMeshHeader {
-    flags: i32,
-    num_faces: u32,
-    bbox_min: Vector,
-    bbox_max: Vector,
-    pos: Vector,
-    parent: i32,
-    extend: i32,
-    num_vertices: u32,
-    ptr_vertices: i32,
-    ptr_indices: i32,
-    num_normals: u32,
-    ptr_normals: i32,
-    ptr_normal_indices: i32,
-    ptr_uvs: i32,
-    ptr_materials: i32,
-    pad: i32,
+    pub flags: i32,
+    pub num_faces: u32,
+    pub bbox_min: Vector,
+    pub bbox_max: Vector,
+    pub pos: Vector,
+    pub parent: i32,
+    pub extend: i32,
+    pub num_vertices: u32,
+    pub ptr_vertices: i32,
+    pub ptr_indices: i32,
+    pub num_normals: u32,
+    pub ptr_normals: i32,
+    pub ptr_normal_indices: i32,
+    pub ptr_uvs: i32,
+    pub ptr_materials: i32,
+    pub pad: i32,
 }
 
 impl KmdMeshHeader {

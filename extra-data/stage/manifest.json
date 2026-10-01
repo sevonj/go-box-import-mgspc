@@ -1,0 +1,20 @@
+{
+  "id": "mgsimport.shadmo",
+  "version": 1,
+  "external": true,
+  "name": "Shadow Moses Island",
+  "description": "Imported from Metal Gear Solid",
+  "resourcePath": "",
+  "modelPath": "mgsimport/stages/shadmo/stage.glb",
+  "collPath": "mgsimport/stages/shadmo/stage.coll",
+  "playerStartPosition": [
+    0,
+    0,
+    0
+  ],
+  "playerStartRotation": [
+    0,
+    0,
+    0
+  ]
+}
