@@ -2,7 +2,9 @@ Metal Gear Solid PC content importer for GoBox.
 
 Can also be used for ripping models and textures for other uses.
 
-Tested and developed with the GOG release. Steam release is actually just PlayStation emulation and will not work (yet?).
+Tested and developed with the GOG release.
+
+Steam release is actually just PlayStation emulation and is not supported (yet?).
 
 work in progress.
 
