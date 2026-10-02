@@ -55,39 +55,45 @@ fn main() {
         println!("no such directory: {:?}", game_dir);
         return;
     }
-    let out_dir = args.out_dir.unwrap_or(
+    let out_path = args.out_dir.unwrap_or(
         game_dir
             .parent()
             .unwrap()
             .join((game_dir.file_name().unwrap().to_string_lossy() + "_extracted").to_string()),
     );
-    let _ = std::fs::remove_dir_all(&out_dir);
+    let _ = std::fs::remove_dir_all(&out_path);
 
-    let stage_mgz_path = game_dir.join("stage.mgz");
-    let temp_path = PathBuf::from(&out_dir).join("temp");
-    let out_stage_path = PathBuf::from(&out_dir).join("stages").join("shadmo");
+    let mut stage_zip = ZipArchive::new(File::open(&game_dir.join("stage.mgz")).unwrap()).unwrap();
 
-    let mut stage_zip = ZipArchive::new(File::open(&stage_mgz_path).unwrap()).unwrap();
+    let out_temp_path = PathBuf::from(&out_path).join("temp");
+    let out_stage_path = PathBuf::from(&out_path).join("stages").join("shadmo");
 
-    std::fs::create_dir_all(&temp_path).unwrap();
+    std::fs::create_dir_all(&out_path).unwrap();
+    std::fs::create_dir_all(&out_temp_path).unwrap();
     std::fs::create_dir_all(&out_stage_path).unwrap();
-    File::create(&out_dir.join(".gdignore")).unwrap();
+
+    File::create(out_path.join(".gdignore")).unwrap();
+    File::create(out_path.join("manifest.json"))
+        .unwrap()
+        .write_all(include_str!("../extra-data/manifest.json").as_bytes())
+        .unwrap();
+
     File::create(out_stage_path.join("manifest.json"))
         .unwrap()
-        .write_all(include_str!("../extra-data/stage/manifest.json").as_bytes())
+        .write_all(include_str!("../extra-data/stages/shadmo/manifest.json").as_bytes())
         .unwrap();
 
     if let Some(format) = args.format {
         for room_info in ROOMS {
             // ROOMS[ROOMS.len() - 5..].iter() {
-            extract_scenes(&mut stage_zip, &room_info, &temp_path, format)
+            extract_scenes(&mut stage_zip, &room_info, &out_temp_path, format)
         }
     }
 
     let mut intermediary = IntermediaryMesh::empty();
     for room_info in ROOMS {
         // ROOMS[ROOMS.len() - 5..].iter() {
-        let room_mesh = get_a_room(&mut stage_zip, room_info, &temp_path);
+        let room_mesh = get_a_room(&mut stage_zip, room_info, &out_temp_path);
         intermediary = intermediary.merge(&room_mesh);
     }
 
