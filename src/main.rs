@@ -1,18 +1,23 @@
 mod error;
+mod gobox_types;
+mod intermediary_mesh;
+mod mgs_types;
 mod stage_info;
-mod types;
 mod util;
 
 use crate::error::MgsError;
+use crate::intermediary_mesh::IntermediaryMat;
+use crate::mgs_types::Darchive;
+use crate::mgs_types::Kmd;
+use crate::mgs_types::KmdMesh;
 use crate::stage_info::*;
-use crate::types::Darchive;
-use crate::types::Kmd;
-use crate::types::KmdMesh;
 use clap::Parser;
 use clap::ValueEnum;
+use glam::Vec2;
 use glam::Vec3;
-use go_box_import_template::gobox_types::Coll;
+use gobox_types::Coll;
 use image::ImageReader;
+use intermediary_mesh::IntermediaryMesh;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs::File;
@@ -38,7 +43,7 @@ struct Args {
     out_dir: Option<PathBuf>,
 
     #[arg(short = 'f', long)]
-    format: ExportFormat,
+    format: Option<ExportFormat>,
 }
 
 fn main() {
@@ -71,43 +76,73 @@ fn main() {
         .unwrap()
         .write_all(include_str!("../extra-data/stage/manifest.json").as_bytes())
         .unwrap();
-    let mut stage_merged = Vec::new();
 
-    for room in ROOMS.iter() {
-        extract_scenes(
-            &mut stage_zip,
-            room,
-            &mut stage_merged,
-            &temp_path,
-            args.format,
-        );
+    if let Some(format) = args.format {
+        for room_info in ROOMS {
+            // ROOMS[ROOMS.len() - 5..].iter() {
+            extract_scenes(&mut stage_zip, &room_info, &temp_path, format)
+        }
     }
-    let coll = generate_coll(&stage_merged);
+
+    let mut intermediary = IntermediaryMesh::empty();
+    for room_info in ROOMS {
+        // ROOMS[ROOMS.len() - 5..].iter() {
+        let room_mesh = get_a_room(&mut stage_zip, room_info, &temp_path);
+        intermediary = intermediary.merge(&room_mesh);
+    }
+
+    for surf in intermediary.surfaces.values_mut() {
+        surf.dedupe();
+    }
+
+    let textures_path = out_stage_path.join("textures");
+    std::fs::create_dir_all(&textures_path).unwrap();
+    for surf in intermediary.surfaces.values_mut() {
+        let Some(mat) = surf.material.as_ref() else {
+            continue;
+        };
+        std::fs::copy(
+            mat.tex_path.with_extension("png"),
+            textures_path.join(&mat.name).with_extension("png"),
+        )
+        .unwrap();
+    }
+
+    let glb_path = out_stage_path.join("stage.glb");
+    std::fs::write(&glb_path, intermediary.to_glb()).unwrap();
+
+    let mut intermediary_coll = intermediary.clone();
+    for surf in intermediary.surfaces.values_mut() {
+        for n in surf.normals.iter_mut() {
+            *n = Vec3::ZERO;
+        }
+        for uv in surf.uvs.iter_mut() {
+            *uv = Vec2::ZERO;
+        }
+    }
+    intermediary_coll.collapse_materials();
+    let coll = intermediary_coll.to_coll();
     let mut coll_file = File::create(&out_stage_path.join("stage.coll")).unwrap();
     coll.serialize(&mut coll_file).unwrap();
     coll_file.flush().unwrap();
-
-    let glb_path = out_stage_path.join("stage.glb");
-    std::fs::write(&glb_path, Kmd::to_glb(&stage_merged)).unwrap();
 }
 
 fn extract_scenes(
     zip: &mut ZipArchive<File>,
     room: &MgsRoomInfo,
-    stage_merged: &mut Vec<KmdMesh>,
     extract_path: &Path,
     format: ExportFormat,
 ) {
     let mut tex_hashes = HashMap::new();
 
-    let room_extract_path = extract_path.join(room.name);
+    let room_extract_path = extract_path.join("stages").join(room.name);
     std::fs::create_dir_all(&room_extract_path).unwrap();
 
     for filename in room.tex_paks {
         let filepath = format!("stage/{}/{filename}", room.name);
         let archive = Darchive::read(&file_from_zip(zip, &filepath), &mut 0).unwrap();
         collect_tex_hashes(&archive, &mut tex_hashes);
-        extract_textures(&archive, &room_extract_path).unwrap();
+        // extract_textures(&archive, &room_extract_path).unwrap();
     }
 
     let mut models = HashMap::new();
@@ -159,21 +194,6 @@ fn extract_scenes(
 
     println!("matches: {num_matches}/{num_textures}");
 
-    for filename in room.static_models {
-        stage_merged.extend(
-            models
-                .get(&room_extract_path.join(filename))
-                .unwrap()
-                .meshes()
-                .iter()
-                .cloned()
-                .map(|mut mesh| {
-                    mesh.header.pos += room.origin;
-                    mesh
-                }),
-        );
-    }
-
     /*
         let room_combined: Vec<KmdMesh> = room
             .static_models
@@ -192,6 +212,64 @@ fn extract_scenes(
             .with_added_extension("glb");
         std::fs::write(&glb_path, Kmd::to_glb(&room_combined)).unwrap();
     */
+}
+
+fn get_a_room(
+    stage_zip: &mut ZipArchive<File>,
+    room_info: &MgsRoomInfo,
+    temp_path: &Path,
+) -> IntermediaryMesh {
+    let room_temp_path = temp_path.join("stages").join(room_info.name);
+    std::fs::create_dir_all(&room_temp_path).unwrap();
+
+    let mut intermediary = IntermediaryMesh::empty();
+    let mut tex_hashes = HashMap::new();
+
+    for filename in room_info.tex_paks {
+        let filepath = format!("stage/{}/{filename}", room_info.name);
+        let archive = Darchive::read(&file_from_zip(stage_zip, &filepath), &mut 0).unwrap();
+        collect_tex_hashes(&archive, &mut tex_hashes);
+        extract_textures(&archive, &room_temp_path).unwrap();
+    }
+
+    let mut models: HashMap<String, Kmd> = HashMap::new();
+    for filename in room_info.mdl_paks {
+        let filepath = format!("stage/{}/{filename}", room_info.name);
+        let archive = Darchive::read(&file_from_zip(stage_zip, &filepath), &mut 0).unwrap();
+
+        for file in archive.files() {
+            let filename = file.name();
+            if !filename.ends_with(".kmd") {
+                continue;
+            }
+            let kmd = Kmd::read(file.contents(), &mut 0).unwrap();
+            models.insert(filename.to_string(), kmd);
+        }
+    }
+
+    for filename in room_info.static_models {
+        let kmd = models.get(*filename).expect(filename);
+        for mesh in kmd.meshes() {
+            let mut joiner = IntermediaryMesh::from(mesh);
+            joiner.origin += Into::<Vec3>::into(room_info.origin);
+            intermediary = intermediary.merge(&joiner);
+        }
+    }
+
+    for surf in intermediary.surfaces.values_mut() {
+        let Some(name) = tex_hashes.get(&surf.mat_id).map(String::as_str) else {
+            continue;
+        };
+
+        surf.material = Some(IntermediaryMat {
+            name: name.to_string(),
+            tex_path: room_temp_path.join(name).with_extension("pcx"),
+            double_sided: true, // TODO
+            transparent: true,  // TODO
+        });
+    }
+
+    intermediary
 }
 
 fn file_from_zip(zip: &mut ZipArchive<File>, name: &str) -> Vec<u8> {

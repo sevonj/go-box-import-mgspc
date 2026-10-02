@@ -4,17 +4,46 @@
   "external": true,
   "name": "Shadow Moses Island",
   "description": "Imported from Metal Gear Solid",
+  "thumbnailPath": "mgsimport/stages/shadmo/textures/m3r_path_door1.png",
   "resourcePath": "",
   "modelPath": "mgsimport/stages/shadmo/stage.glb",
   "collPath": "mgsimport/stages/shadmo/stage.coll",
   "playerStartPosition": [
-    0,
-    0,
-    0
+    -17.5,
+    -25,
+    -6
   ],
   "playerStartRotation": [
     0,
     0,
     0
+  ],
+  "props": [
+    {
+      "res": "res://scenes/prop_tv.tscn",
+      "pos": [
+        11.205,
+        -21.04,
+        -209.345
+      ],
+      "rot": [
+        0,
+        -23.5,
+        0
+      ]
+    },
+    {
+      "res": "res://scenes/prop_hogball.tscn",
+      "pos": [
+        11.824,
+        -21.15,
+        -208.764
+      ],
+      "rot": [
+        -9.5,
+        -43.9,
+        1.8
+      ]
+    }
   ]
 }

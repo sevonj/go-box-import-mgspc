@@ -1,7 +1,8 @@
 mod error;
-pub mod gobox_types;
+mod gobox_types;
+mod intermediary_mesh;
+mod mgs_types;
 mod stage_info;
-mod types;
 mod util;
 
 wit_bindgen::generate!({

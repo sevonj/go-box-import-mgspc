@@ -4,8 +4,8 @@ mod to_wavefront;
 use glam::Vec2;
 
 use crate::error::MgsError;
-use crate::types::Vector;
-use crate::types::vector::ShortVector;
+use crate::mgs_types::Vector;
+use crate::mgs_types::vector::ShortVector;
 use crate::util::*;
 
 /// Deserialized kmd file
@@ -78,7 +78,7 @@ impl Into<Vec2> for KmdUv {
     fn into(self) -> Vec2 {
         Vec2 {
             x: self.0[0] as f32 / 256.0,
-            y: 1.0 - self.0[1] as f32 / 256.0,
+            y: self.0[1] as f32 / 256.0,
         }
     }
 }
@@ -291,7 +291,7 @@ impl KmdMesh {
         self.normals.len()
     }
 
-    pub fn merge(&self, others: &[Self]) -> Self {
+    /* pub fn merge(&self, others: &[Self]) -> Self {
         let mut base_vertex = self.num_vertices();
         let mut base_face = self.num_faces();
         // let mut base_normal = self.num_normals();
@@ -310,17 +310,18 @@ impl KmdMesh {
 
         for other in others {
             vertices.extend_from_slice(other.vertices());
-            /*for face in other.faces(){
+            for face in other.vertex_faces(){
                 let mut face = face.clone();
-                for v in face{
+                for v in face {
+                    let v = v as usize;
                     v += base_vertex;
                 }
                 base_vertex += other.num_vertices();
-            }*/
+            }
         }
 
         todo!()
-    }
+    }*/
 }
 
 /// 1:1 from disk

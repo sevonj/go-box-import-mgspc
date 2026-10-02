@@ -1,4 +1,4 @@
-use crate::types::Vector;
+use crate::mgs_types::Vector;
 
 pub const ROOMS: &'static [MgsRoomInfo] = &[
     // underwater entrance
@@ -7,12 +7,12 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
         tex_paks: &["stg_tex1.dar", "stg_tex2.dar", "stg_tex3.dar"],
         mdl_paks: &["stg_mdl1.dar"],
         static_models: &[
+            "00a.kmd",
             "00a_o1.kmd",
             "00a_o2.kmd",
             "00a_o3.kmd",
             "00a_o4.kmd",
             "00a_r2.kmd",
-            "00a.kmd",
         ],
         origin: Vector {
             x: -11200,
@@ -25,7 +25,7 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
         name: "s01a",
         tex_paks: &["stg_tex1.dar", "stg_tex2.dar", "stg_tex3.dar"],
         mdl_paks: &["stg_mdl1.dar"],
-        static_models: &["01a_o1.kmd", "01a.kmd"],
+        static_models: &["01a.kmd", "01a_o1.kmd"],
         origin: Vector {
             x: 0,
             y: 0,
@@ -38,6 +38,7 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
         tex_paks: &["stg_tex1.dar", "stg_tex2.dar", "stg_tex3.dar"],
         mdl_paks: &["stg_mdl1.dar"],
         static_models: &[
+            "02a.kmd",
             "02a_d1.kmd",
             "02a_d2.kmd",
             "02a_d3.kmd",
@@ -59,7 +60,6 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
             "02a_r11.kmd",
             "02a_r12.kmd",
             "02a_r13.kmd",
-            "02a.kmd",
         ],
         origin: Vector {
             x: 0 * 1024,
@@ -73,6 +73,7 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
         tex_paks: &["stg_tex1.dar", "stg_tex2.dar"],
         mdl_paks: &["stg_mdl1.dar"],
         static_models: &[
+            "03a.kmd",
             "03a_d1.kmd",
             "03a_d2.kmd",
             "03a_d3.kmd",
@@ -81,7 +82,6 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
             "03a_o1b.kmd",
             "03a_o2.kmd",
             "03a_r1.kmd",
-            "03a.kmd",
         ],
         origin: Vector {
             x: -4 * 1025,
@@ -95,12 +95,12 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
         tex_paks: &["stg_tex1.dar", "stg_tex2.dar", "stg_tex3.dar"],
         mdl_paks: &["stg_mdl1.dar"],
         static_models: &[
+            "03b.kmd",
             "03b_d1.kmd",
             "03b_d2.kmd",
             "03b_d3.kmd",
             "03b_d4.kmd",
             "03b_o1.kmd",
-            "03b.kmd",
         ],
         origin: Vector {
             x: -10 * 1024 - 200,
@@ -114,6 +114,7 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
         tex_paks: &["stg_tex1.dar", "stg_tex2.dar"],
         mdl_paks: &["stg_mdl1.dar"],
         static_models: &[
+            "04a.kmd",
             "04a_d1.kmd",
             "04a_d2.kmd",
             "04a_d3.kmd",
@@ -137,7 +138,6 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
             "04a_r7.kmd",
             "04a_r8.kmd",
             "04a_r9.kmd",
-            "04a.kmd",
         ],
         origin: Vector {
             x: -2 * 1024 - 512,
@@ -151,6 +151,7 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
         tex_paks: &["stg_tex1.dar", "stg_tex2.dar"],
         mdl_paks: &["stg_mdl1.dar"],
         static_models: &[
+            "04b.kmd",
             "04b_d1.kmd",
             "04b_d2.kmd",
             "04b_d3.kmd",
@@ -158,7 +159,6 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
             "04b_o2a.kmd",
             "04b_o3a.kmd",
             "04b_r1.kmd",
-            "04b.kmd",
         ],
         origin: Vector {
             x: -4 * 1024,
@@ -172,11 +172,11 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
         tex_paks: &["stg_tex1.dar", "stg_tex2.dar", "stg_tex3.dar"],
         mdl_paks: &["stg_mdl1.dar"],
         static_models: &[
+            "05a.kmd",
             "05a_d1a.kmd",
             "05a_o1.kmd",
             "05a_o2.kmd",
             "05a_o3.kmd",
-            "05a.kmd",
         ],
         origin: Vector {
             x: 2 * 1024,
@@ -190,16 +190,155 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
         tex_paks: &["stg_tex1.dar", "stg_tex2.dar"],
         mdl_paks: &["stg_mdl1.dar"],
         static_models: &[
+            "06a.kmd",
             "06a_d1.kmd",
             "06a_d2.kmd",
             "06a_o1.kmd",
             "06a_r1.kmd",
-            "06a.kmd",
         ],
         origin: Vector {
             x: -6 * 1024,
             y: -5 * 1024,
             z: -184 * 1024,
+        },
+    },
+    // toilet floor
+    MgsRoomInfo {
+        name: "s07a",
+        tex_paks: &["stg_tex1.dar", "stg_tex2.dar"],
+        mdl_paks: &["stg_mdl1.dar"],
+        static_models: &[
+            "07a.kmd",
+            "07a_d1.kmd",
+            "07a_d2.kmd",
+            "07a_d3.kmd",
+            "07a_d4.kmd",
+            "07a_d5.kmd",
+            "07a_d6.kmd",
+            "07a_d7.kmd",
+            "07a_d8.kmd",
+            "07a_d9.kmd",
+            "07a_d10.kmd",
+            "07a_d11.kmd",
+            "07a_d12.kmd",
+            "07a_d13.kmd",
+            "07a_d14.kmd",
+            "07a_d15.kmd",
+            "07a_d16.kmd",
+            "07a_d17.kmd",
+            "07a_d18.kmd",
+            "07a_d19.kmd",
+            "07a_d20.kmd",
+            "07a_o1.kmd",
+            "07a_r1.kmd",
+            "07a_r2.kmd",
+            "07a_r3.kmd",
+        ],
+        origin: Vector {
+            x: -9 * 1024 - 512,
+            y: -12 * 1024,
+            z: -194 * 1024,
+        },
+    },
+    // admin office
+    MgsRoomInfo {
+        name: "s07b",
+        tex_paks: &["stg_tex1.dar", "stg_tex2.dar"],
+        mdl_paks: &["stg_mdl1.dar", "stg_mdl2.dar"],
+        static_models: &[
+            "07b.kmd",
+            "07b_d1a.kmd",
+            "07b_d2.kmd",
+            "07b_d3.kmd",
+            "07b_d4.kmd",
+            "07b_o1.kmd",
+            "07b_o2.kmd",
+            "07b_o3.kmd",
+            "07b_o4.kmd",
+            "07b_o5.kmd",
+            "07b_o6.kmd",
+            "07b_o7.kmd",
+            "07b_o8.kmd",
+            "07b_o9.kmd",
+            "07b_o10.kmd",
+            "07b_o11.kmd",
+            "07b_o12.kmd",
+            "07b_r1.kmd",
+        ],
+        origin: Vector {
+            x: -13 * 1024 - 512,
+            y: -12 * 1024,
+            z: -228 * 1024,
+        },
+    },
+    // Electric Gas Floor
+    MgsRoomInfo {
+        name: "s08a",
+        tex_paks: &["stg_tex1.dar", "stg_tex2.dar", "stg_tex3.dar"],
+        mdl_paks: &["stg_mdl1.dar"],
+        static_models: &[
+            "08a.kmd",
+            "08a_d1.kmd",
+            "08a_d2.kmd",
+            "08a_d3.kmd",
+            "08a_d4.kmd",
+            "08a_d5.kmd",
+            "08a_d6.kmd",
+            "08a_d7.kmd",
+            "08a_d8.kmd",
+            "08a_d9.kmd",
+            "08a_d10.kmd",
+            "08a_d11.kmd",
+            "08a_o1.kmd",
+            "08a_r1.kmd",
+        ],
+        origin: Vector {
+            x: -12 * 1024,
+            y: -22 * 1024,
+            z: -190 * 1024,
+        },
+    },
+    // Japanese animes room
+    MgsRoomInfo {
+        name: "s08b",
+        tex_paks: &["stg_tex1.dar", "stg_tex2.dar"],
+        mdl_paks: &["stg_mdl1.dar"],
+        static_models: &[
+            "08b.kmd",
+            "08b_d1.kmd",
+            "08b_d2.kmd",
+            "08b_d3.kmd",
+            "08b_d4.kmd",
+            "08b_o4.kmd",
+            "08b_o5a.kmd",
+            "08b_o6a.kmd",
+            "08b_o7a.kmd",
+            "08b_o8a.kmd",
+            "08b_o9a.kmd",
+            "08b_o10a.kmd",
+            "08b_o11a.kmd",
+            "08b_o12a.kmd",
+            "08b_o13a.kmd",
+            "08b_o14a.kmd",
+            "08b_o15a.kmd",
+            "08b_o16a.kmd",
+        ],
+        origin: Vector {
+            x: 7 * 1024 - 400,
+            y: -22 * 1024,
+            z: -206 * 1024 - 128,
+        },
+    },
+    // ghosts
+    MgsRoomInfo {
+        name: "s08c",
+        tex_paks: &["stg_tex1.dar", "stg_tex2.dar"],
+        mdl_paks: &["stg_mdl1.dar"],
+        static_models: &["08c.kmd", "08c_d1.kmd", "08c_d2.kmd"],
+        origin: Vector {
+            x: -0 * 1024,
+            y: -22 * 1024,
+            z: -188 * 1024 - 512,
         },
     },
 ];

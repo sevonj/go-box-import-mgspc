@@ -1,5 +1,5 @@
 use super::Kmd;
-use crate::types::KmdMesh;
+use crate::mgs_types::KmdMesh;
 use glam::DVec3;
 use glam::Vec2;
 use glam::Vec3;
