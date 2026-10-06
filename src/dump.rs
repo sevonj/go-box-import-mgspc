@@ -14,7 +14,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use zip::ZipArchive;
 
-pub fn dump_assets(format: ExportFormat, game_dir: PathBuf, out_dir: PathBuf) {
+pub fn dump_assets(format: ExportFormat, game_dir: &Path, out_dir: &Path) {
     let mut stage_zip = ZipArchive::new(File::open(&game_dir.join("stage.mgz")).unwrap()).unwrap();
 
     if std::fs::exists(&out_dir).unwrap() {

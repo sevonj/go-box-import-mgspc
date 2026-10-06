@@ -69,10 +69,13 @@ fn main() {
     );
 
     if let Some(format) = args.format {
-        dump_assets(format, game_dir, out_path);
-        return;
+        dump_assets(format, &game_dir, &out_path);
+    } else {
+        gobox_import(&game_dir, &out_path);
     }
+}
 
+fn gobox_import(game_dir: &Path, out_path: &Path) {
     let _ = std::fs::remove_dir_all(&out_path);
     let mut stage_zip = ZipArchive::new(File::open(&game_dir.join("stage.mgz")).unwrap()).unwrap();
 
