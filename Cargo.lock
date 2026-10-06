@@ -688,6 +688,7 @@ dependencies = [
  "clap",
  "glam 0.33.1",
  "gltf",
+ "gltf-json",
  "image",
  "image-extras",
  "json",

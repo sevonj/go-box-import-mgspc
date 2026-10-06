@@ -1,7 +1,8 @@
 use crate::gobox_types::Coll;
+use crate::intermediary_mesh::MatTranspMode::Half;
 use crate::mgs_types::KmdMesh;
-use glam::Vec2;
 use glam::Vec3;
+use glam::{EulerRot, Quat, Vec2};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -63,7 +64,22 @@ impl IntermediaryMesh {
         }
     }
 
-    pub(crate) fn collapse_materials(&mut self) {
+    // temporary, until objects are implemented
+    pub fn rotate(&mut self, euler: Vec3) {
+        let rot = Quat::from_euler(EulerRot::XYZ, euler.x, euler.y, euler.z);
+
+        for surf in self.surfaces.values_mut() {
+            for p in &mut surf.positions {
+                *p = rot * *p;
+            }
+            for n in &mut surf.normals {
+                // Rotation preserves length, so unit normals stay unit.
+                *n = rot * *n;
+            }
+        }
+    }
+
+    pub fn collapse_materials(&mut self) {
         let mut surfaces = self.surfaces.clone();
         let mut supersurf = IntermediarySurf::new(0);
         for surf in surfaces.values() {
@@ -80,7 +96,7 @@ impl IntermediaryMesh {
         surfaces.insert(0, supersurf);
     }
 
-    pub fn merge(&self, rhs: &Self) -> Self {
+    pub fn join(&self, rhs: &Self) -> Self {
         let mut surfaces = self.surfaces.clone();
         for mat_id in rhs.surfaces.keys() {
             if !surfaces.contains_key(&mat_id) {
@@ -89,9 +105,7 @@ impl IntermediaryMesh {
 
             let surf = surfaces.get_mut(&mat_id).unwrap();
             let rhsurf = rhs.surfaces.get(&mat_id).unwrap();
-            if surf.material.is_none() {
-                surf.material = rhsurf.material.clone();
-            }
+            surf.material = rhsurf.material.clone();
 
             let base_v = surf.positions.len() as u32;
             surf.positions.extend(
@@ -110,6 +124,54 @@ impl IntermediaryMesh {
             origin: self.origin,
             surfaces,
         }
+    }
+
+    pub fn from_seal_glb(glb: &[u8], origin: Vec3) -> Self {
+        let gltf = gltf::Gltf::from_slice(glb).unwrap();
+        let blob = gltf.blob.as_deref();
+
+        let mut positions: Vec<Vec3> = vec![];
+        let mut indices: Vec<u32> = vec![];
+
+        for mesh in gltf.document.meshes() {
+            for primitive in mesh.primitives() {
+                assert_eq!(primitive.mode(), gltf::mesh::Mode::Triangles);
+
+                let reader = primitive.reader(|buffer| match buffer.source() {
+                    gltf::buffer::Source::Bin => blob,
+                    gltf::buffer::Source::Uri(_) => None,
+                });
+
+                let prim_positions: Vec<Vec3> =
+                    reader.read_positions().unwrap().map(Vec3::from).collect();
+
+                let base_v = positions.len() as u32;
+                indices.extend(
+                    reader
+                        .read_indices()
+                        .unwrap()
+                        .into_u32()
+                        .map(|i| i + base_v),
+                );
+                positions.extend(prim_positions);
+            }
+        }
+
+        let num_vertices = positions.len();
+        let mut surfaces = HashMap::new();
+        surfaces.insert(
+            0,
+            IntermediarySurf {
+                mat_id: 0,
+                material: IntermediaryMatData::Sealant,
+                positions,
+                normals: vec![Vec3::ZERO; num_vertices],
+                uvs: vec![Vec2::ZERO; num_vertices],
+                indices,
+            },
+        );
+
+        Self { origin, surfaces }
     }
 
     pub fn to_wavefront(&self, materials: Option<&HashMap<u16, String>>) -> String {
@@ -178,9 +240,16 @@ impl IntermediaryMesh {
 }
 
 #[derive(Debug, Clone)]
+pub enum IntermediaryMatData {
+    None,
+    Texture(IntermediaryTexInfo),
+    Sealant,
+}
+
+#[derive(Debug, Clone)]
 pub struct IntermediarySurf {
     pub mat_id: u16,
-    pub material: Option<IntermediaryMat>,
+    pub material: IntermediaryMatData,
     pub positions: Vec<Vec3>,
     pub normals: Vec<Vec3>,
     pub uvs: Vec<Vec2>,
@@ -191,7 +260,7 @@ impl IntermediarySurf {
     pub fn new(mat_id: u16) -> Self {
         Self {
             mat_id,
-            material: None,
+            material: IntermediaryMatData::None,
             positions: vec![],
             normals: vec![],
             uvs: vec![],
@@ -244,17 +313,25 @@ impl IntermediarySurf {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MatTranspMode {
+    Opaque,
+    Mask,
+    Half,
+    Additive,
+}
+
 #[derive(Debug, Clone)]
-pub struct IntermediaryMat {
+pub struct IntermediaryTexInfo {
     pub name: String,
-    pub tex_path: PathBuf,
-    pub transparent: bool,
+    pub path: PathBuf,
+    pub transparency: MatTranspMode,
     pub double_sided: bool,
 }
 
 mod to_gltf {
-    use crate::intermediary_mesh::IntermediaryMat;
     use crate::intermediary_mesh::IntermediaryMesh;
+    use crate::intermediary_mesh::{IntermediaryMatData, MatTranspMode};
     use glam::DVec3;
     use glam::Vec2;
     use glam::Vec3;
@@ -285,8 +362,10 @@ mod to_gltf {
     use gltf::mesh::Mode;
     use gltf::texture::MagFilter;
     use gltf::texture::MinFilter;
+    use gltf_json::extensions::material::Unlit;
+    use gltf_json::material::AlphaCutoff;
+    use gltf_json::material::AlphaMode;
     use std::collections::BTreeMap;
-    use std::collections::HashMap;
 
     #[derive(Debug)]
     struct TempPrim {
@@ -295,7 +374,7 @@ mod to_gltf {
         base_index: usize,
         num_indices: usize,
         material_id: u16,
-        material: Option<IntermediaryMat>,
+        material: IntermediaryMatData,
     }
 
     impl IntermediaryMesh {
@@ -388,11 +467,28 @@ mod to_gltf {
                 let mut images: Vec<Image> = Vec::new();
                 let mut textures: Vec<Texture> = Vec::new();
                 let samplers = vec![Sampler {
-                    mag_filter: Some(Checked::Valid(MagFilter::Linear)),
-                    min_filter: Some(Checked::Valid(MinFilter::LinearMipmapLinear)),
+                    mag_filter: Some(Checked::Valid(MagFilter::Nearest)),
+                    min_filter: Some(Checked::Valid(MinFilter::Nearest)),
                     ..Default::default()
                 }];
                 let mut nodes: Vec<Node> = vec![];
+
+                let mat_sealant_idx = materials.len() as u32;
+                materials.push(Material {
+                    name: Some("room_sealant".to_string()),
+                    pbr_metallic_roughness: PbrMetallicRoughness {
+                        base_color_factor: PbrBaseColorFactor([0.0, 0.0, 0.0, 1.0]),
+                        metallic_factor: StrengthFactor(0.0),
+                        roughness_factor: StrengthFactor(0.5),
+                        ..Default::default()
+                    },
+                    double_sided: false,
+                    extensions: Some(gltf_json::extensions::material::Material {
+                        unlit: Some(Unlit {}),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                });
 
                 for (mesh_idx, temp_prims) in temp_meshes.iter().enumerate() {
                     let mut primitives = vec![];
@@ -441,65 +537,87 @@ mod to_gltf {
                             Index::new(base_accessor + 2),
                         );
 
-                        let material = if let Some(mat) = temp_prim.material.as_ref() {
-                            let name = mat.name.clone();
-                            images.push(Image {
-                                buffer_view: None,
-                                mime_type: None,
-                                name: Some(name.clone()),
-                                uri: Some(format!("textures/{name}.png")),
-                                extensions: None,
-                                extras: Void::default(),
-                            });
-
-                            textures.push(Texture {
-                                name: Some(name.clone()),
-                                sampler: Some(Index::new(0)),
-                                source: Index::new(images.len() as u32 - 1),
-                                extensions: None,
-                                extras: Void::default(),
-                            });
-
-                            Material {
-                                name: Some(name),
-                                pbr_metallic_roughness: PbrMetallicRoughness {
-                                    base_color_factor: PbrBaseColorFactor([1.0, 1.0, 1.0, 1.0]),
-                                    base_color_texture: Some(Info {
-                                        index: Index::new(textures.len() as u32 - 1),
-                                        tex_coord: 0,
-                                        extensions: None,
-                                        extras: Void::default(),
+                        let mat_idx = match &temp_prim.material {
+                            IntermediaryMatData::None => {
+                                materials.push(Material {
+                                    name: Some(format!(
+                                        "MISSING_PLACEHOLDER_{}",
+                                        temp_prim.material_id
+                                    )),
+                                    pbr_metallic_roughness: PbrMetallicRoughness {
+                                        base_color_factor: PbrBaseColorFactor([1.0, 0.0, 1.0, 1.0]),
+                                        metallic_factor: StrengthFactor(0.0),
+                                        roughness_factor: StrengthFactor(0.5),
+                                        ..Default::default()
+                                    },
+                                    double_sided: true,
+                                    extensions: Some(gltf_json::extensions::material::Material {
+                                        unlit: Some(Unlit {}),
+                                        ..Default::default()
                                     }),
-                                    metallic_factor: StrengthFactor(0.0),
-                                    roughness_factor: StrengthFactor(1.0),
                                     ..Default::default()
-                                },
-                                double_sided: mat.double_sided,
-                                ..Default::default()
+                                });
+                                materials.len() as u32 - 1
                             }
-                        } else {
-                            Material {
-                                name: Some(format!(
-                                    "MISSING_PLACEHOLDER_{}",
-                                    temp_prim.material_id
-                                )),
-                                pbr_metallic_roughness: PbrMetallicRoughness {
-                                    base_color_factor: PbrBaseColorFactor([1.0, 0.0, 1.0, 1.0]),
-                                    metallic_factor: StrengthFactor(0.0),
-                                    roughness_factor: StrengthFactor(0.5),
-                                    ..Default::default()
-                                },
-                                double_sided: true,
-                                ..Default::default()
-                            }
-                        };
+                            IntermediaryMatData::Texture(tex_info) => {
+                                let name = tex_info.name.clone();
+                                images.push(Image {
+                                    buffer_view: None,
+                                    mime_type: None,
+                                    name: Some(name.clone()),
+                                    uri: Some(format!("textures/{name}.png")),
+                                    extensions: None,
+                                    extras: Void::default(),
+                                });
 
-                        materials.push(material);
+                                textures.push(Texture {
+                                    name: Some(name.clone()),
+                                    sampler: Some(Index::new(0)),
+                                    source: Index::new(images.len() as u32 - 1),
+                                    extensions: None,
+                                    extras: Void::default(),
+                                });
+
+                                // TODO: Figure out additive
+                                let a = match tex_info.transparency {
+                                    MatTranspMode::Opaque | MatTranspMode::Mask => 1.0,
+                                    MatTranspMode::Half | MatTranspMode::Additive => 0.5,
+                                };
+                                materials.push(Material {
+                                    name: Some(name),
+                                    alpha_mode: match tex_info.transparency {
+                                        MatTranspMode::Opaque => Checked::Valid(AlphaMode::Opaque),
+                                        MatTranspMode::Mask => Checked::Valid(AlphaMode::Mask),
+                                        MatTranspMode::Half => Checked::Valid(AlphaMode::Blend),
+                                        MatTranspMode::Additive => Checked::Valid(AlphaMode::Blend),
+                                    },
+                                    alpha_cutoff: Some(AlphaCutoff(0.5)),
+                                    pbr_metallic_roughness: PbrMetallicRoughness {
+                                        base_color_factor: PbrBaseColorFactor([1.0, 1.0, 1.0, a]),
+                                        base_color_texture: Some(Info {
+                                            index: Index::new(textures.len() as u32 - 1),
+                                            tex_coord: 0,
+                                            extensions: None,
+                                            extras: Void::default(),
+                                        }),
+                                        ..Default::default()
+                                    },
+                                    double_sided: tex_info.double_sided,
+                                    extensions: Some(gltf_json::extensions::material::Material {
+                                        unlit: Some(Unlit {}),
+                                        ..Default::default()
+                                    }),
+                                    ..Default::default()
+                                });
+                                materials.len() as u32 - 1
+                            }
+                            _ => mat_sealant_idx,
+                        };
 
                         primitives.push(Primitive {
                             attributes,
                             indices: Some(Index::new(base_accessor + 3)),
-                            material: Some(Index::new(materials.len() as u32 - 1)),
+                            material: Some(Index::new(mat_idx)),
                             mode: Checked::Valid(Mode::Triangles),
                             extensions: None,
                             extras: Void::default(),

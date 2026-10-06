@@ -1,25 +1,25 @@
 mod error;
+mod extract;
 mod gobox_types;
 mod intermediary_mesh;
 mod mgs_types;
 mod stage_info;
 mod util;
 
-use crate::error::MgsError;
-use crate::intermediary_mesh::IntermediaryMat;
+use crate::intermediary_mesh::IntermediaryMatData;
+use crate::intermediary_mesh::IntermediaryTexInfo;
+use crate::intermediary_mesh::MatTranspMode;
 use crate::mgs_types::Darchive;
 use crate::mgs_types::Kmd;
-use crate::mgs_types::KmdMesh;
 use crate::stage_info::*;
+use crate::util::tex_hash;
 use clap::Parser;
 use clap::ValueEnum;
 use glam::Vec2;
 use glam::Vec3;
-use gobox_types::Coll;
 use image::ImageReader;
 use intermediary_mesh::IntermediaryMesh;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
@@ -86,7 +86,7 @@ fn main() {
     if let Some(format) = args.format {
         for room_info in ROOMS {
             // ROOMS[ROOMS.len() - 5..].iter() {
-            extract_scenes(&mut stage_zip, &room_info, &out_temp_path, format)
+            extract::extract_room_models(&mut stage_zip, &room_info, &out_temp_path, format)
         }
     }
 
@@ -94,7 +94,7 @@ fn main() {
     for room_info in ROOMS {
         // ROOMS[ROOMS.len() - 5..].iter() {
         let room_mesh = get_a_room(&mut stage_zip, room_info, &out_temp_path);
-        intermediary = intermediary.merge(&room_mesh);
+        intermediary = intermediary.join(&room_mesh);
     }
 
     for surf in intermediary.surfaces.values_mut() {
@@ -104,12 +104,12 @@ fn main() {
     let textures_path = out_stage_path.join("textures");
     std::fs::create_dir_all(&textures_path).unwrap();
     for surf in intermediary.surfaces.values_mut() {
-        let Some(mat) = surf.material.as_ref() else {
+        let IntermediaryMatData::Texture(tex_info) = &surf.material else {
             continue;
         };
         std::fs::copy(
-            mat.tex_path.with_extension("png"),
-            textures_path.join(&mat.name).with_extension("png"),
+            tex_info.path.with_extension("png"),
+            textures_path.join(&tex_info.name).with_extension("png"),
         )
         .unwrap();
     }
@@ -133,93 +133,6 @@ fn main() {
     coll_file.flush().unwrap();
 }
 
-fn extract_scenes(
-    zip: &mut ZipArchive<File>,
-    room: &MgsRoomInfo,
-    extract_path: &Path,
-    format: ExportFormat,
-) {
-    let mut tex_hashes = HashMap::new();
-
-    let room_extract_path = extract_path.join("stages").join(room.name);
-    std::fs::create_dir_all(&room_extract_path).unwrap();
-
-    for filename in room.tex_paks {
-        let filepath = format!("stage/{}/{filename}", room.name);
-        let archive = Darchive::read(&file_from_zip(zip, &filepath), &mut 0).unwrap();
-        collect_tex_hashes(&archive, &mut tex_hashes);
-        // extract_textures(&archive, &room_extract_path).unwrap();
-    }
-
-    let mut models = HashMap::new();
-    for filename in room.mdl_paks {
-        let filepath = format!("stage/{}/{filename}", room.name);
-        let archive = Darchive::read(&file_from_zip(zip, &filepath), &mut 0).unwrap();
-
-        for file in archive.files() {
-            let filename = file.name();
-            let extracted_filepath = room_extract_path.join(filename);
-            if filename.ends_with(".kmd") {
-                assert!(!models.contains_key(&extracted_filepath));
-                models.insert(
-                    extracted_filepath,
-                    Kmd::read(file.contents(), &mut 0).unwrap(),
-                );
-            }
-        }
-    }
-
-    let num_textures = tex_hashes.len();
-    let mut num_matches = 0;
-    let mut checked_hashes = HashSet::new();
-    for (file_path, kmd) in &models {
-        for model in kmd.meshes() {
-            for hash in model.material_ids() {
-                if checked_hashes.contains(hash) {
-                    continue;
-                }
-                checked_hashes.insert(*hash);
-                if tex_hashes.contains_key(hash) {
-                    num_matches += 1;
-                }
-            }
-        }
-        match format {
-            ExportFormat::Glb => {
-                let glb_path = file_path.with_added_extension("glb");
-                std::fs::write(&glb_path, Kmd::to_glb(kmd.meshes())).unwrap();
-            }
-            ExportFormat::Obj => {
-                let wavefront_path = file_path.with_added_extension("obj");
-                std::fs::write(&wavefront_path, kmd.to_wavefront(&tex_hashes)).unwrap();
-            }
-        }
-    }
-
-    write_mtl(&mut tex_hashes, &room_extract_path.join("mats.mtl")).unwrap();
-
-    println!("matches: {num_matches}/{num_textures}");
-
-    /*
-        let room_combined: Vec<KmdMesh> = room
-            .static_models
-            .iter()
-            .map(|filename| {
-                models
-                    .get(&room_extract_path.join(filename))
-                    .unwrap()
-                    .meshes()
-            })
-            .flatten()
-            .cloned()
-            .collect();
-        let glb_path = room_extract_path
-            .join("_room_combined")
-            .with_added_extension("glb");
-        std::fs::write(&glb_path, Kmd::to_glb(&room_combined)).unwrap();
-    */
-}
-
 fn get_a_room(
     stage_zip: &mut ZipArchive<File>,
     room_info: &MgsRoomInfo,
@@ -235,7 +148,7 @@ fn get_a_room(
         let filepath = format!("stage/{}/{filename}", room_info.name);
         let archive = Darchive::read(&file_from_zip(stage_zip, &filepath), &mut 0).unwrap();
         collect_tex_hashes(&archive, &mut tex_hashes);
-        extract_textures(&archive, &room_temp_path).unwrap();
+        extract::extract_textures(&archive, &room_temp_path).unwrap();
     }
 
     let mut models: HashMap<String, Kmd> = HashMap::new();
@@ -253,26 +166,53 @@ fn get_a_room(
         }
     }
 
-    for filename in room_info.static_models {
-        let kmd = models.get(*filename).expect(filename);
-        for mesh in kmd.meshes() {
-            let mut joiner = IntermediaryMesh::from(mesh);
-            joiner.origin += Into::<Vec3>::into(room_info.origin);
-            intermediary = intermediary.merge(&joiner);
-        }
+    for static_info in room_info.static_geom {
+        let kmd = models
+            .get(static_info.kmd_filename)
+            .expect(static_info.kmd_filename);
+
+        if let Some(curated) = static_info.meshes {
+            for i in curated {
+                let mut joiner = IntermediaryMesh::from(&kmd.meshes()[*i]);
+                joiner.origin += room_info.origin;
+                intermediary = intermediary.join(&joiner);
+            }
+        } else {
+            for mesh in kmd.meshes() {
+                let mut joiner = IntermediaryMesh::from(mesh);
+                joiner.origin += room_info.origin;
+                intermediary = intermediary.join(&joiner);
+            }
+        };
     }
 
     for surf in intermediary.surfaces.values_mut() {
         let Some(name) = tex_hashes.get(&surf.mat_id).map(String::as_str) else {
             continue;
         };
+        let png_path = room_temp_path.join(name).with_extension("png");
+        let img = ImageReader::open(&png_path).unwrap().decode().unwrap();
 
-        surf.material = Some(IntermediaryMat {
+        let transparency = if name.ends_with("hlf") {
+            MatTranspMode::Half
+        } else if name.ends_with("add") {
+            MatTranspMode::Additive
+        } else if img.has_alpha() {
+            MatTranspMode::Mask
+        } else {
+            MatTranspMode::Opaque
+        };
+        let double_sided = transparency != MatTranspMode::Opaque; // TODO: maybe
+        surf.material = IntermediaryMatData::Texture(IntermediaryTexInfo {
             name: name.to_string(),
-            tex_path: room_temp_path.join(name).with_extension("pcx"),
-            double_sided: true, // TODO
-            transparent: true,  // TODO
+            path: room_temp_path.join(name).with_extension("pcx"),
+            double_sided,
+            transparency,
         });
+    }
+
+    if let Some(glb) = room_info.seal_model {
+        intermediary = intermediary.join(&IntermediaryMesh::from_seal_glb(glb, room_info.origin));
     }
 
     intermediary
@@ -292,63 +232,4 @@ fn collect_tex_hashes(archive: &Darchive, tex_hashes: &mut HashMap<u16, String>)
             tex_hashes.insert(hash, stem.to_string());
         }
     }
-}
-
-fn extract_textures(archive: &Darchive, path: &Path) -> Result<(), MgsError> {
-    for file in archive.files() {
-        let filename = file.name();
-        if filename.ends_with(".pcx") {
-            let pcx_path = path.join(filename);
-            std::fs::write(&pcx_path, file.contents())?;
-            let img = ImageReader::open(&pcx_path)?.decode().unwrap();
-            // let img = ImageReader::new(Cursor::new(file.contents()))
-            //     .decode()
-            //     .unwrap();
-            img.save(path.join(filename).with_extension("png")).unwrap();
-        }
-    }
-    Ok(())
-}
-
-fn write_mtl(tex_hashes: &mut HashMap<u16, String>, path: &Path) -> Result<(), MgsError> {
-    let mut out = String::new();
-    for name in tex_hashes.values() {
-        out.push_str(&format!("newmtl {name}\n"));
-        out.push_str(&format!("map_Kd {name}.png\n"));
-    }
-
-    std::fs::write(path, out.as_bytes())?;
-    Ok(())
-}
-
-fn tex_hash(name: &str) -> u16 {
-    let mut v = 0_u16;
-    for c in name.chars() {
-        v = (v << 5) | (v >> 11);
-        v = v.wrapping_add(c as u16);
-    }
-    v
-}
-
-fn generate_coll(meshes: &[KmdMesh]) -> Coll {
-    let mut coll = Coll::default();
-    for mesh in meshes {
-        let pos: Vec3 = mesh.header().pos.into();
-        let vertices = mesh.vertices();
-        for face in mesh.vertex_faces() {
-            let a: Vec3 = vertices[face[0] as usize].into();
-            let b: Vec3 = vertices[face[1] as usize].into();
-            let c: Vec3 = vertices[face[2] as usize].into();
-            let d: Vec3 = vertices[face[3] as usize].into();
-
-            coll.vbuf.extend((a + pos).to_array());
-            coll.vbuf.extend((b + pos).to_array());
-            coll.vbuf.extend((c + pos).to_array());
-            coll.vbuf.extend((c + pos).to_array());
-            coll.vbuf.extend((d + pos).to_array());
-            coll.vbuf.extend((a + pos).to_array());
-            coll.num_tris += 2;
-        }
-    }
-    coll
 }

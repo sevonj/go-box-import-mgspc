@@ -10,6 +10,15 @@ use std::any::type_name;
 
 use crate::error::MgsError;
 
+pub fn tex_hash(name: &str) -> u16 {
+    let mut v = 0_u16;
+    for c in name.chars() {
+        v = (v << 5) | (v >> 11);
+        v = v.wrapping_add(c as u16);
+    }
+    v
+}
+
 pub fn check_fits_buf<T>(buf: &[u8]) -> Result<(), MgsError> {
     let expected = size_of::<T>();
     if buf.len() < expected {

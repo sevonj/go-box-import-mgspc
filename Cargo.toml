@@ -10,6 +10,7 @@ crate-type = ["cdylib"]
 clap = { version = "4.6.1", features = ["derive"] }
 glam = "0.33.1"
 gltf = "1.4.1"
+gltf-json = { version = "1.4.1", features = ["KHR_materials_unlit"] }
 image = "0.25.10"
 image-extras = "0.1" #{ version = "0.1", features = ["pcx"], default-features = false }
 json = "0.12.4"
