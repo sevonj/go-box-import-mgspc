@@ -1,11 +1,13 @@
+mod dump;
 mod error;
-mod extract;
 mod gobox_types;
 mod intermediary_mesh;
 mod mgs_types;
 mod stage_info;
 mod util;
 
+use crate::dump::dump_assets;
+use crate::error::MgsError;
 use crate::intermediary_mesh::IntermediaryMatData;
 use crate::intermediary_mesh::IntermediaryTexInfo;
 use crate::intermediary_mesh::MatTranspMode;
@@ -17,7 +19,10 @@ use clap::Parser;
 use clap::ValueEnum;
 use glam::Vec2;
 use glam::Vec3;
+use image::GenericImageView;
 use image::ImageReader;
+use image::Rgba;
+use image::RgbaImage;
 use intermediary_mesh::IntermediaryMesh;
 use std::collections::HashMap;
 use std::fs::File;
@@ -55,14 +60,20 @@ fn main() {
         println!("no such directory: {:?}", game_dir);
         return;
     }
+
     let out_path = args.out_dir.unwrap_or(
         game_dir
             .parent()
             .unwrap()
             .join((game_dir.file_name().unwrap().to_string_lossy() + "_extracted").to_string()),
     );
-    let _ = std::fs::remove_dir_all(&out_path);
 
+    if let Some(format) = args.format {
+        dump_assets(format, game_dir, out_path);
+        return;
+    }
+
+    let _ = std::fs::remove_dir_all(&out_path);
     let mut stage_zip = ZipArchive::new(File::open(&game_dir.join("stage.mgz")).unwrap()).unwrap();
 
     let out_temp_path = PathBuf::from(&out_path).join("temp");
@@ -82,13 +93,6 @@ fn main() {
         .unwrap()
         .write_all(include_str!("../extra-data/stages/shadmo/manifest.json").as_bytes())
         .unwrap();
-
-    if let Some(format) = args.format {
-        for room_info in ROOMS {
-            // ROOMS[ROOMS.len() - 5..].iter() {
-            extract::extract_room_models(&mut stage_zip, &room_info, &out_temp_path, format)
-        }
-    }
 
     let mut intermediary = IntermediaryMesh::empty();
     for room_info in ROOMS {
@@ -148,7 +152,7 @@ fn get_a_room(
         let filepath = format!("stage/{}/{filename}", room_info.name);
         let archive = Darchive::read(&file_from_zip(stage_zip, &filepath), &mut 0).unwrap();
         collect_tex_hashes(&archive, &mut tex_hashes);
-        extract::extract_textures(&archive, &room_temp_path).unwrap();
+        extract_textures(&archive, &room_temp_path).unwrap();
     }
 
     let mut models: HashMap<String, Kmd> = HashMap::new();
@@ -232,4 +236,41 @@ fn collect_tex_hashes(archive: &Darchive, tex_hashes: &mut HashMap<u16, String>)
             tex_hashes.insert(hash, stem.to_string());
         }
     }
+}
+
+pub fn extract_textures(archive: &Darchive, path: &Path) -> Result<(), MgsError> {
+    for file in archive.files() {
+        let pcx_filename = file.name();
+        if let Some(stem) = pcx_filename.strip_suffix(".pcx") {
+            let tex_id = tex_hash(&stem);
+            let pcx_path = path.join(pcx_filename);
+            let png_path = pcx_path.with_extension("png");
+            std::fs::write(&pcx_path, file.contents())?;
+            let img = ImageReader::open(&pcx_path)?.decode().unwrap();
+
+            let mut has_alpha: bool = false;
+            // pure black is transparent
+            for (_, _, val) in img.pixels() {
+                if val.0[0] == 0 && val.0[1] == 0 && val.0[2] == 0 {
+                    has_alpha = true;
+                    break;
+                }
+            }
+
+            if !has_alpha {
+                img.save(png_path).unwrap();
+                continue;
+            }
+
+            let mut rgba: RgbaImage = img.to_rgba8();
+            for Rgba([r, g, b, a]) in rgba.pixels_mut() {
+                if *r == 0 && *g == 0 && *b == 0 {
+                    *a = 0;
+                }
+            }
+
+            rgba.save(png_path).unwrap();
+        }
+    }
+    Ok(())
 }

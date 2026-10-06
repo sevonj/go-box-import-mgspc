@@ -9,7 +9,7 @@ impl Kmd {
         let mut out = String::new();
         let mut base_v = 1;
         let mut base_vt = 1;
-        out.push_str("mtllib mats.mtl\n");
+        out.push_str("mtllib extracted_materials.mtl\n");
 
         for (i, mesh) in self.meshes.iter().enumerate() {
             out.push_str(&format!("o mesh_{i}\n"));
