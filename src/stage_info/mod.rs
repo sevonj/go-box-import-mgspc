@@ -1,4 +1,11 @@
+mod s08a;
+mod s08b;
+mod s08c;
+
 use glam::Vec3;
+use s08a::*;
+use s08b::*;
+use s08c::*;
 
 pub const NUKE_BLDG_OFFSET: Vec3 = Vec3 {
     x: -6.0,
@@ -21,7 +28,7 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
             RoomStaticInfo::new("00a_r2.kmd", None, None),
         ],
         objects: &[],
-        seal_model: Some(include_bytes!("../extra-data/room_seals/seal_00a.glb")),
+        seal_model: Some(include_bytes!("../../extra-data/room_seals/seal_00a.glb")),
         origin: Vec3 {
             x: -11.0,
             y: -25.0,
@@ -75,7 +82,7 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
             RoomStaticInfo::new("02a_r13.kmd", None, None),
         ],
         objects: &[],
-        seal_model: Some(include_bytes!("../extra-data/room_seals/seal_02a.glb")),
+        seal_model: Some(include_bytes!("../../extra-data/room_seals/seal_02a.glb")),
         origin: Vec3 {
             x: 0.0,
             y: 0.0,
@@ -222,7 +229,7 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
             RoomStaticInfo::new("06a_r1.kmd", None, None),
         ],
         objects: &[],
-        seal_model: Some(include_bytes!("../extra-data/room_seals/seal_06a.glb")),
+        seal_model: Some(include_bytes!("../../extra-data/room_seals/seal_06a.glb")),
         origin: NUKE_BLDG_OFFSET,
     },
     // toilet floor
@@ -258,7 +265,7 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
             RoomStaticInfo::new("07a_r3.kmd", None, None),
         ],
         objects: &[],
-        seal_model: Some(include_bytes!("../extra-data/room_seals/seal_07a.glb")),
+        seal_model: Some(include_bytes!("../../extra-data/room_seals/seal_07a.glb")),
         origin: Vec3 {
             // pretty good
             x: NUKE_BLDG_OFFSET.x - 3.41797,
@@ -292,7 +299,7 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
             RoomStaticInfo::new("07b_r1.kmd", None, None),
         ],
         objects: &[],
-        seal_model: Some(include_bytes!("../extra-data/room_seals/seal_07b.glb")),
+        seal_model: Some(include_bytes!("../../extra-data/room_seals/seal_07b.glb")),
         origin: Vec3 {
             // pretty good
             x: NUKE_BLDG_OFFSET.x - 7.56836,
@@ -301,239 +308,9 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
         },
     },
     // Electric Floor Gas Chamber
-    MgsRoomInfo {
-        name: "s08a",
-        tex_paks: &["stg_tex1.dar", "stg_tex2.dar", "stg_tex3.dar"],
-        mdl_paks: &["stg_mdl1.dar"],
-        static_geom: &[
-            RoomStaticInfo::new(
-                "08a.kmd",
-                Some(&[
-                    // 0, s08c floor
-                    // 1, s08c door frame sides
-                    // 2, s08c door frame floor
-                    // 3, s08c door frame top
-                    4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-                    // 17, otacon sneak peek floor
-                    // 18, otacon sneak peek wall
-                    // 19, otacon sneak peek divider
-                    20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
-                    40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58,
-                ]),
-                None,
-            ),
-            // KmdImportInfo::new("08a_d1.kmd",   None),
-            // KmdImportInfo::new("08a_d2.kmd",   None),
-            // KmdImportInfo::new("08a_d3.kmd",   None),
-            // KmdImportInfo::new("08a_d4.kmd",   None),
-            // KmdImportInfo::new("08a_d5.kmd",   None),
-            // KmdImportInfo::new("08a_d6.kmd",   None),
-            // KmdImportInfo::new("08a_d7.kmd",   None),
-            // KmdImportInfo::new("08a_d8.kmd",   None),
-            // KmdImportInfo::new("08a_d9.kmd",   None),
-            // KmdImportInfo::new("08a_d10.kmd",   None),
-            // KmdImportInfo::new("08a_d11.kmd",   None),
-            // KmdImportInfo::new("08a_o1.kmd",   None), // electric floor
-            RoomStaticInfo::new("08a_r1.kmd", None, None), // ev shaft
-        ],
-        objects: &[
-            RoomObjInfo::new(
-                "08a_o1a.kmd",
-                "08a_o1a",
-                "Electrical cabinet",
-                /*Vec3 {
-                    x: -4.70898,
-                    y: 0.0,
-                    z: -12.8174,
-                },*/
-                None,
-                None,
-            ),
-            RoomObjInfo::new(
-                "08a_o1b.kmd",
-                "08a_o1b",
-                "Electrical cabinet (broken)",
-                None,
-                None,
-            ),
-        ],
-        seal_model: Some(include_bytes!("../extra-data/room_seals/seal_08a.glb")),
-        origin: Vec3 {
-            // pretty good
-            x: NUKE_BLDG_OFFSET.x - 5.85938,
-            y: NUKE_BLDG_OFFSET.y - 20.0,
-            z: NUKE_BLDG_OFFSET.z - 5.37109,
-        },
-    },
-    // Japanese animes room
-    MgsRoomInfo {
-        name: "s08b",
-        tex_paks: &["stg_tex1.dar", "stg_tex2.dar"],
-        mdl_paks: &["stg_mdl1.dar"],
-        static_geom: &[
-            RoomStaticInfo::new(
-                "08b.kmd",
-                Some(&[
-                    0, 1, 2, 3, 4, 5, // 6, s08c door frame, floor
-                    7, 8, 9, 10, // playstation, misc props
-                    11, 12, 13, // keyboards
-                    14, 15, 16, 17, 18, 19, 20,
-                ]),
-                None,
-            ),
-            RoomStaticInfo::new("08b_o4.kmd", None, None), // locker interior
-                                                           // --- Console panels left to right
-                                                           // TODO: Panel arrangement is wrong. But honestly who's gonna notice?
-        ],
-        objects: &[
-            // --- misc
-            RoomObjInfo::new("08b_d1.kmd", "08b_d1", "locker door left", None, None),
-            RoomObjInfo::new("08b_d2.kmd", "08b_d2", "locker door right", None, None),
-            // RoomObjInfo::new("08b_d3.kmd", "08b_d3", "door_l4", None),
-            RoomObjInfo::new("08b_d4.kmd", "08b_d4", "locker something", None, None),
-            // --- Consoles
-            RoomObjInfo::new("08b_o5a.kmd", "08b_o5a", "Console screen", None, None),
-            RoomObjInfo::new(
-                "08b_o5b.kmd",
-                "08b_o5b",
-                "Console screen (broken)",
-                None,
-                None,
-            ),
-            RoomObjInfo::new("08b_o6a.kmd", "08b_o6a", "Console panel", None, None),
-            RoomObjInfo::new(
-                "08b_o6b.kmd",
-                "08b_o6b",
-                "Console panel (broken)",
-                None,
-                None,
-            ),
-            RoomObjInfo::new("08b_o7a.kmd", "08b_o7a", "Console panel", None, None),
-            RoomObjInfo::new(
-                "08b_o7b.kmd",
-                "08b_o7b",
-                "Console panel (broken)",
-                None,
-                None,
-            ),
-            RoomObjInfo::new("08b_o8a.kmd", "08b_o8a", "Console screen", None, None),
-            RoomObjInfo::new(
-                "08b_o8b.kmd",
-                "08b_o8b",
-                "Console screen (broken)",
-                None,
-                None,
-            ),
-            RoomObjInfo::new("08b_o9a.kmd", "08b_o9a", "Console panel", None, None),
-            RoomObjInfo::new(
-                "08b_o9b.kmd",
-                "08b_o9b",
-                "Console panel (broken)",
-                None,
-                None,
-            ),
-            RoomObjInfo::new("08b_o10a.kmd", "08b_o10a", "Console panel", None, None),
-            RoomObjInfo::new(
-                "08b_o10b.kmd",
-                "08b_o10b",
-                "Console panel (broken)",
-                None,
-                None,
-            ),
-            RoomObjInfo::new("08b_o15a.kmd", "08b_o15a", "Console panel", None, None),
-            RoomObjInfo::new(
-                "08b_o15b.kmd",
-                "08b_o15b",
-                "Console panel (broken)",
-                None,
-                None,
-            ),
-            RoomObjInfo::new("08b_o16a.kmd", "08b_o16a", "Console panel", None, None),
-            RoomObjInfo::new(
-                "08b_o16b.kmd",
-                "08b_o16b",
-                "Console panel (broken)",
-                None,
-                None,
-            ),
-            // --- Computers
-            RoomObjInfo::new(
-                "08b_o11a.kmd",
-                "08b_o11a",
-                "Supercomputer rack door A",
-                None,
-                None,
-            ),
-            RoomObjInfo::new(
-                "08b_o11b.kmd",
-                "08b_o11b",
-                "Supercomputer rack door A (broken)",
-                None,
-                None,
-            ),
-            RoomObjInfo::new(
-                "08b_o12a.kmd",
-                "08b_o12a",
-                "Supercomputer rack door B",
-                None,
-                None,
-            ),
-            RoomObjInfo::new(
-                "08b_o12b.kmd",
-                "08b_o112b",
-                "Supercomputer rack door B (broken)",
-                None,
-                None,
-            ),
-            RoomObjInfo::new(
-                "08b_o13a.kmd",
-                "08b_o13a",
-                "Large beige cabinet door",
-                None,
-                None,
-            ),
-            RoomObjInfo::new(
-                "08b_o13b.kmd",
-                "08b_o13b",
-                "large beige cabinet door (broken)",
-                None,
-                None,
-            ),
-            RoomObjInfo::new("08b_o14a.kmd", "08b_o14a", "Beige rack door", None, None),
-            RoomObjInfo::new(
-                "08b_o14b.kmd",
-                "08b_o14b",
-                "Beige rack door (broken)",
-                None,
-                None,
-            ),
-        ],
-        seal_model: Some(include_bytes!("../extra-data/room_seals/seal_08b.glb")),
-        origin: Vec3 {
-            // pretty good
-            x: NUKE_BLDG_OFFSET.x + 13.184558, //12.6953,
-            y: NUKE_BLDG_OFFSET.y - 20.0,
-            z: NUKE_BLDG_OFFSET.z - 21.4844,
-        },
-    },
-    // ghosts
-    MgsRoomInfo {
-        name: "s08c",
-        tex_paks: &["stg_tex1.dar", "stg_tex2.dar"],
-        mdl_paks: &["stg_mdl1.dar"],
-        static_geom: &[RoomStaticInfo::new("08c.kmd", None, None)],
-        objects: &[
-           // MgsRoomObjInfo::new("08c_d1.kmd", "08c_d1", None),
-           // MgsRoomObjInfo::new("08c_d2.kmd", "08c_d2", None),
-        ],
-        seal_model: None,
-        origin: Vec3 {
-            // pretty good
-            x: NUKE_BLDG_OFFSET.x + 6.59179,
-            y: NUKE_BLDG_OFFSET.y - 20.0,
-            z: NUKE_BLDG_OFFSET.z - 3.90725,
-        },
-    },
+    ROOM_S08A,
+    ROOM_S08B, // Japanese animes
+    ROOM_S08C, // Ghosts hallway
 ];
 
 pub struct MgsRoomInfo {
