@@ -48,7 +48,7 @@ impl Kmd {
             }
 
             base_v += num_vertices;
-            base_vt += mesh.vertex_faces().len() * 4;
+            base_vt += mesh.vertex_faces.len() * 4;
         }
         out
     }

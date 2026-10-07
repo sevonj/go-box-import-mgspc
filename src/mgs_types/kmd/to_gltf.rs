@@ -30,7 +30,6 @@ struct TempPrim {
     num_vertices: usize,
     base_index: usize,
     num_indices: usize,
-    material_id: u16,
 }
 
 impl Kmd {
@@ -46,13 +45,13 @@ impl Kmd {
             for mesh in meshes {
                 let pos: Vec3 = mesh.header.pos.into();
                 let input_positions: Vec<Vec3> = mesh
-                    .vertices()
+                    .vertices
                     .iter()
                     .map(Into::into)
                     .map(|p: Vec3| p + pos)
                     .collect();
-                let input_normals: Vec<Vec3> = mesh.normals().iter().map(Into::into).collect();
-                let input_uvs: Vec<Vec2> = mesh.uvs().iter().map(Into::into).collect();
+                let input_normals: Vec<Vec3> = mesh.normals.iter().map(Into::into).collect();
+                let input_uvs: Vec<Vec2> = mesh.uvs.iter().map(Into::into).collect();
 
                 let mut temp_prims: Vec<TempPrim> = vec![];
 
@@ -90,7 +89,6 @@ impl Kmd {
                         num_vertices: prim_positions.len(),
                         base_index: indices.len(),
                         num_indices: prim_indices.len(),
-                        material_id: *mat_id,
                     });
 
                     positions.extend(prim_positions);

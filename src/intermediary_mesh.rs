@@ -1,19 +1,26 @@
 use crate::gobox_types::Coll;
-use crate::intermediary_mesh::MatTranspMode::Half;
 use crate::mgs_types::KmdMesh;
+use glam::Vec2;
 use glam::Vec3;
-use glam::{EulerRot, Quat, Vec2};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct IntermediaryMesh {
     pub origin: Vec3,
-    pub surfaces: HashMap<u16, IntermediarySurf>,
+    /// Key includes folder name because the hash alone results in collision hell
+    pub surfaces: HashMap<(String, u16), IntermediarySurf>,
 }
 
-impl From<&KmdMesh> for IntermediaryMesh {
-    fn from(mesh: &KmdMesh) -> Self {
+impl IntermediaryMesh {
+    pub fn empty() -> Self {
+        Self {
+            origin: Vec3::ZERO,
+            surfaces: HashMap::new(),
+        }
+    }
+
+    pub fn from_kmd(mesh: &KmdMesh, tex_prefix: String) -> Self {
         let num_faces = mesh.num_faces();
 
         assert_eq!(num_faces, mesh.vertex_faces.len());
@@ -24,11 +31,13 @@ impl From<&KmdMesh> for IntermediaryMesh {
         let mut surfaces = HashMap::new();
 
         for i in 0..num_faces {
-            let mat_id = mesh.material_ids[i];
-            if !surfaces.contains_key(&mat_id) {
-                surfaces.insert(mat_id, IntermediarySurf::new(mat_id));
+            let tex_hash = mesh.material_ids[i];
+            let key = (tex_prefix.clone(), tex_hash);
+
+            if !surfaces.contains_key(&key) {
+                surfaces.insert(key.clone(), IntermediarySurf::new(tex_hash));
             }
-            let surf = surfaces.get_mut(&mat_id).unwrap();
+            let surf = surfaces.get_mut(&key).unwrap();
 
             let vface = &mesh.vertex_faces[i];
             let nface = &mesh.normal_faces[i];
@@ -51,77 +60,6 @@ impl From<&KmdMesh> for IntermediaryMesh {
 
         Self {
             origin: mesh.header.pos.into(),
-            surfaces,
-        }
-    }
-}
-
-impl IntermediaryMesh {
-    pub fn empty() -> Self {
-        Self {
-            origin: Vec3::ZERO,
-            surfaces: HashMap::new(),
-        }
-    }
-
-    // temporary, until objects are implemented
-    pub fn rotate(&mut self, euler: Vec3) {
-        let rot = Quat::from_euler(EulerRot::XYZ, euler.x, euler.y, euler.z);
-
-        for surf in self.surfaces.values_mut() {
-            for p in &mut surf.positions {
-                *p = rot * *p;
-            }
-            for n in &mut surf.normals {
-                // Rotation preserves length, so unit normals stay unit.
-                *n = rot * *n;
-            }
-        }
-    }
-
-    pub fn collapse_materials(&mut self) {
-        let mut surfaces = self.surfaces.clone();
-        let mut supersurf = IntermediarySurf::new(0);
-        for surf in surfaces.values() {
-            let base_v = supersurf.positions.len() as u32;
-            supersurf.positions.extend(&surf.positions);
-            supersurf.normals.extend(&surf.normals);
-            supersurf
-                .indices
-                .extend(surf.indices.iter().map(|i| i + base_v));
-            supersurf.uvs.extend(&surf.uvs);
-        }
-        supersurf.dedupe();
-        surfaces.clear();
-        surfaces.insert(0, supersurf);
-    }
-
-    pub fn join(&self, rhs: &Self) -> Self {
-        let mut surfaces = self.surfaces.clone();
-        for mat_id in rhs.surfaces.keys() {
-            if !surfaces.contains_key(&mat_id) {
-                surfaces.insert(*mat_id, IntermediarySurf::new(*mat_id));
-            }
-
-            let surf = surfaces.get_mut(&mat_id).unwrap();
-            let rhsurf = rhs.surfaces.get(&mat_id).unwrap();
-            surf.material = rhsurf.material.clone();
-
-            let base_v = surf.positions.len() as u32;
-            surf.positions.extend(
-                rhsurf
-                    .positions
-                    .iter()
-                    .map(|v| v + rhs.origin - self.origin),
-            );
-            surf.normals.extend(&rhsurf.normals);
-            surf.indices
-                .extend(rhsurf.indices.iter().map(|i| i + base_v));
-            surf.uvs.extend(&rhsurf.uvs);
-        }
-
-        Self {
-            origin: self.origin,
             surfaces,
         }
     }
@@ -160,9 +98,8 @@ impl IntermediaryMesh {
         let num_vertices = positions.len();
         let mut surfaces = HashMap::new();
         surfaces.insert(
-            0,
+            (String::new(), 0),
             IntermediarySurf {
-                mat_id: 0,
                 material: IntermediaryMatData::Sealant,
                 positions,
                 normals: vec![Vec3::ZERO; num_vertices],
@@ -203,10 +140,12 @@ impl IntermediaryMesh {
                 out.push_str(&format!("vt {} {}\n", uv.x, uv.y));
             }
 
-            let mat_name = materials
-                .and_then(|m| m.get(&surf.mat_id))
-                .cloned()
-                .unwrap_or(surf.mat_id.to_string());
+            let mat_name = match &surf.material {
+                IntermediaryMatData::NotFound(id) => id.to_string(),
+                IntermediaryMatData::Texture(info) => info.name.to_string(),
+                IntermediaryMatData::Sealant => unreachable!("sealant obj export ?!"),
+            };
+
             out.push_str(&format!("usemtl {mat_name}\n"));
 
             for i in 0..surf.indices.len() / 3 {
@@ -237,18 +176,64 @@ impl IntermediaryMesh {
         }
         coll
     }
+
+    pub fn collapse_materials(&mut self) {
+        let mut surfaces = self.surfaces.clone();
+        let mut supersurf = IntermediarySurf::new(0);
+        for surf in surfaces.values() {
+            let base_v = supersurf.positions.len() as u32;
+            supersurf.positions.extend(&surf.positions);
+            supersurf.normals.extend(&surf.normals);
+            supersurf
+                .indices
+                .extend(surf.indices.iter().map(|i| i + base_v));
+            supersurf.uvs.extend(&surf.uvs);
+        }
+        supersurf.dedupe();
+        surfaces.clear();
+        surfaces.insert((String::new(), 0), supersurf);
+    }
+
+    pub fn join(&self, rhs: &Self) -> Self {
+        let mut surfaces = self.surfaces.clone();
+        for key in rhs.surfaces.keys() {
+            if !surfaces.contains_key(key) {
+                surfaces.insert(key.clone(), IntermediarySurf::new(key.1));
+            }
+
+            let surf = surfaces.get_mut(key).unwrap();
+            let rhsurf = rhs.surfaces.get(key).unwrap();
+            surf.material = rhsurf.material.clone();
+
+            let base_v = surf.positions.len() as u32;
+            surf.positions.extend(
+                rhsurf
+                    .positions
+                    .iter()
+                    .map(|v| v + rhs.origin - self.origin),
+            );
+            surf.normals.extend(&rhsurf.normals);
+            surf.indices
+                .extend(rhsurf.indices.iter().map(|i| i + base_v));
+            surf.uvs.extend(&rhsurf.uvs);
+        }
+
+        Self {
+            origin: self.origin,
+            surfaces,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub enum IntermediaryMatData {
-    None,
+    NotFound(u16),
     Texture(IntermediaryTexInfo),
     Sealant,
 }
 
 #[derive(Debug, Clone)]
 pub struct IntermediarySurf {
-    pub mat_id: u16,
     pub material: IntermediaryMatData,
     pub positions: Vec<Vec3>,
     pub normals: Vec<Vec3>,
@@ -259,8 +244,7 @@ pub struct IntermediarySurf {
 impl IntermediarySurf {
     pub fn new(mat_id: u16) -> Self {
         Self {
-            mat_id,
-            material: IntermediaryMatData::None,
+            material: IntermediaryMatData::NotFound(mat_id),
             positions: vec![],
             normals: vec![],
             uvs: vec![],
@@ -373,7 +357,6 @@ mod to_gltf {
         num_vertices: usize,
         base_index: usize,
         num_indices: usize,
-        material_id: u16,
         material: IntermediaryMatData,
     }
 
@@ -395,7 +378,6 @@ mod to_gltf {
                         num_vertices: surf.positions.len(),
                         base_index: indices.len(),
                         num_indices: surf.indices.len(),
-                        material_id: surf.mat_id,
                         material: surf.material.clone(),
                     });
 
@@ -538,12 +520,9 @@ mod to_gltf {
                         );
 
                         let mat_idx = match &temp_prim.material {
-                            IntermediaryMatData::None => {
+                            IntermediaryMatData::NotFound(id) => {
                                 materials.push(Material {
-                                    name: Some(format!(
-                                        "MISSING_PLACEHOLDER_{}",
-                                        temp_prim.material_id
-                                    )),
+                                    name: Some(format!("MISSING_PLACEHOLDER_{id}",)),
                                     pbr_metallic_roughness: PbrMetallicRoughness {
                                         base_color_factor: PbrBaseColorFactor([1.0, 0.0, 1.0, 1.0]),
                                         metallic_factor: StrengthFactor(0.0),

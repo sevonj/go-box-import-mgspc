@@ -6,17 +6,47 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+use crate::error::MgsError;
+use image::DynamicImage;
+use image::GenericImageView;
+use image::Rgba;
+use image::RgbaImage;
 use std::any::type_name;
 
-use crate::error::MgsError;
-
-pub fn tex_hash(name: &str) -> u16 {
+pub fn file_name_hash(name: &str) -> u16 {
     let mut v = 0_u16;
     for c in name.chars() {
-        v = (v << 5) | (v >> 11);
+        v = v.rotate_left(5);
         v = v.wrapping_add(c as u16);
     }
     v
+}
+
+pub fn process_pcx(bytes: &[u8]) -> DynamicImage {
+    let img = image::load_from_memory(bytes).unwrap();
+    assert!(matches!(img, DynamicImage::ImageRgb8(_)));
+
+    let mut has_alpha: bool = false;
+    // pure black is transparent
+    for (_, _, val) in img.pixels() {
+        if val.0[0] == 0 && val.0[1] == 0 && val.0[2] == 0 {
+            has_alpha = true;
+            break;
+        }
+    }
+
+    if !has_alpha {
+        return img;
+    }
+
+    let mut rgba: RgbaImage = img.to_rgba8();
+    for Rgba([r, g, b, a]) in rgba.pixels_mut() {
+        if *r == 0 && *g == 0 && *b == 0 {
+            *a = 0;
+        }
+    }
+
+    DynamicImage::ImageRgba8(rgba)
 }
 
 pub fn check_fits_buf<T>(buf: &[u8]) -> Result<(), MgsError> {
@@ -89,7 +119,7 @@ pub fn read_array<const N: usize>(buf: &[u8], offset: usize) -> [u8; N] {
         .unwrap()
 }
 
-pub fn read_slice<'a>(buf: &'a [u8], offset: usize, len: usize) -> Result<&'a [u8], MgsError> {
+pub fn read_slice(buf: &[u8], offset: usize, len: usize) -> Result<&[u8], MgsError> {
     if buf.len() < offset + len {
         return Err(MgsError::BufferTooSmall {
             for_what: "read_slice",

@@ -11,8 +11,8 @@ use crate::util::*;
 /// Deserialized kmd file
 #[derive(Debug, Clone)]
 pub struct Kmd {
-    header: KmdHeader,
-    meshes: Vec<KmdMesh>,
+    pub header: KmdHeader,
+    pub meshes: Vec<KmdMesh>,
 }
 
 impl Kmd {
@@ -34,14 +34,6 @@ impl Kmd {
         }
 
         Ok(Self { header, meshes })
-    }
-
-    pub fn header(&self) -> &KmdHeader {
-        &self.header
-    }
-
-    pub fn meshes(&self) -> &[KmdMesh] {
-        &self.meshes
     }
 }
 
@@ -251,34 +243,6 @@ impl KmdMesh {
         })
     }
 
-    pub fn header(&self) -> &KmdMeshHeader {
-        &self.header
-    }
-
-    pub fn vertices(&self) -> &[ShortVector] {
-        &self.vertices
-    }
-
-    pub fn vertex_faces(&self) -> &[[u8; 4]] {
-        &self.vertex_faces
-    }
-
-    pub fn normals(&self) -> &[ShortVector] {
-        &self.normals
-    }
-
-    pub fn normal_faces(&self) -> &[[u8; 4]] {
-        &self.normal_faces
-    }
-
-    pub fn uvs(&self) -> &[KmdUv] {
-        &self.uvs
-    }
-
-    pub fn material_ids(&self) -> &[u16] {
-        &self.material_ids
-    }
-
     pub fn num_faces(&self) -> usize {
         self.vertex_faces.len()
     }
@@ -290,38 +254,6 @@ impl KmdMesh {
     pub fn num_normals(&self) -> usize {
         self.normals.len()
     }
-
-    /* pub fn merge(&self, others: &[Self]) -> Self {
-        let mut base_vertex = self.num_vertices();
-        let mut base_face = self.num_faces();
-        // let mut base_normal = self.num_normals();
-
-        let num_faces = base_face + others.iter().map(Self::num_faces).sum::<usize>();
-        let num_vertices = base_vertex + others.iter().map(Self::num_vertices).sum::<usize>();
-        // let num_normals = base_normal + others.iter().map(Self::num_normals).sum::<usize>();
-
-        let mut vertices = Vec::with_capacity(num_vertices);
-        // let mut faces = Vec::with_capacity(num_faces);
-        // let mut normals = Vec::with_capacity(num_normals);
-
-        vertices.extend_from_slice(&self.vertices);
-        //        faces.extend_from_slice(&self.faces);
-        // normals.extend_from_slice(&self.normals);
-
-        for other in others {
-            vertices.extend_from_slice(other.vertices());
-            for face in other.vertex_faces(){
-                let mut face = face.clone();
-                for v in face {
-                    let v = v as usize;
-                    v += base_vertex;
-                }
-                base_vertex += other.num_vertices();
-            }
-        }
-
-        todo!()
-    }*/
 }
 
 /// 1:1 from disk

@@ -2,7 +2,7 @@ use crate::ExportFormat;
 use crate::error::MgsError;
 use crate::mgs_types::Darchive;
 use crate::mgs_types::Kmd;
-use crate::util::tex_hash;
+use crate::util::file_name_hash;
 use image::GenericImageView;
 use image::ImageReader;
 use image::Rgba;
@@ -75,10 +75,10 @@ pub fn dump_assets(format: ExportFormat, game_dir: &Path, out_dir: &Path) {
             texture_table_table.insert(parent.clone(), HashMap::new());
         }
         let stem = pcx_path.file_stem().unwrap().to_str().unwrap();
-        let crc = tex_hash(stem);
+        let hash = file_name_hash(stem);
         let texture_table = texture_table_table.get_mut(&parent).unwrap();
-        assert!(!texture_table.contains_key(&crc));
-        texture_table.insert(crc, stem.to_string());
+        assert!(!texture_table.contains_key(&hash));
+        texture_table.insert(hash, stem.to_string());
         let convert_dir = parent.join("converted_models");
         std::fs::create_dir_all(&convert_dir).unwrap();
         let png_path = convert_dir.join(stem).with_extension("png");
@@ -147,7 +147,7 @@ fn convert_kmd(
     match format {
         ExportFormat::Glb => {
             let glb_path = out_dir.join(stem).with_extension("glb");
-            std::fs::write(&glb_path, Kmd::to_glb(kmd.meshes())).unwrap();
+            std::fs::write(&glb_path, Kmd::to_glb(&kmd.meshes)).unwrap();
         }
         ExportFormat::Obj => {
             let obj_path = out_dir.join(stem).with_extension("obj");
