@@ -7,6 +7,7 @@ use std::path::Path;
 const SIGNATURE: &[u8; 16] = b"GoBox Collision\n";
 const VERSION: u32 = 2;
 
+#[derive(Debug)]
 pub struct Coll {
     pub signature: [u8; 16],
     pub version: u32,

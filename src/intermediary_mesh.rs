@@ -142,7 +142,7 @@ impl IntermediaryMesh {
 
             let mat_name = match &surf.material {
                 IntermediaryMatData::NotFound(id) => id.to_string(),
-                IntermediaryMatData::Texture(info) => info.name.to_string(),
+                IntermediaryMatData::Texture(info) => info.stem.to_string(),
                 IntermediaryMatData::Sealant => unreachable!("sealant obj export ?!"),
             };
 
@@ -162,8 +162,9 @@ impl IntermediaryMesh {
     }
 
     pub fn to_coll(&self) -> Coll {
+        let stripped = self.stripped_for_coll();
         let mut coll = Coll::default();
-        for surf in self.surfaces.values() {
+        for surf in stripped.surfaces.values() {
             for i in 0..surf.indices.len() / 3 {
                 let a = surf.indices[i * 3] as usize;
                 let b = surf.indices[i * 3 + 2] as usize;
@@ -177,7 +178,7 @@ impl IntermediaryMesh {
         coll
     }
 
-    pub fn collapse_materials(&mut self) {
+    fn stripped_for_coll(&self) -> Self {
         let mut surfaces = self.surfaces.clone();
         let mut supersurf = IntermediarySurf::new(0);
         for surf in surfaces.values() {
@@ -189,9 +190,20 @@ impl IntermediaryMesh {
                 .extend(surf.indices.iter().map(|i| i + base_v));
             supersurf.uvs.extend(&surf.uvs);
         }
+        for n in supersurf.normals.iter_mut() {
+            *n = Vec3::ZERO;
+        }
+        for uv in supersurf.uvs.iter_mut() {
+            *uv = Vec2::ZERO;
+        }
         supersurf.dedupe();
         surfaces.clear();
         surfaces.insert((String::new(), 0), supersurf);
+
+        Self {
+            origin: self.origin,
+            surfaces,
+        }
     }
 
     pub fn join(&self, rhs: &Self) -> Self {
@@ -307,7 +319,7 @@ pub enum MatTranspMode {
 
 #[derive(Debug, Clone)]
 pub struct IntermediaryTexInfo {
-    pub name: String,
+    pub stem: String,
     pub path: PathBuf,
     pub transparency: MatTranspMode,
     pub double_sided: bool,
@@ -539,18 +551,18 @@ mod to_gltf {
                                 materials.len() as u32 - 1
                             }
                             IntermediaryMatData::Texture(tex_info) => {
-                                let name = tex_info.name.clone();
+                                let stem = tex_info.stem.clone();
                                 images.push(Image {
                                     buffer_view: None,
                                     mime_type: None,
-                                    name: Some(name.clone()),
-                                    uri: Some(format!("textures/{name}.png")),
+                                    name: Some(stem.clone()),
+                                    uri: Some(format!("../textures/{stem}.png")),
                                     extensions: None,
                                     extras: Void::default(),
                                 });
 
                                 textures.push(Texture {
-                                    name: Some(name.clone()),
+                                    name: Some(stem.clone()),
                                     sampler: Some(Index::new(0)),
                                     source: Index::new(images.len() as u32 - 1),
                                     extensions: None,
@@ -563,7 +575,7 @@ mod to_gltf {
                                     MatTranspMode::Half | MatTranspMode::Additive => 0.5,
                                 };
                                 materials.push(Material {
-                                    name: Some(name),
+                                    name: Some(stem),
                                     alpha_mode: match tex_info.transparency {
                                         MatTranspMode::Opaque => Checked::Valid(AlphaMode::Opaque),
                                         MatTranspMode::Mask => Checked::Valid(AlphaMode::Mask),
