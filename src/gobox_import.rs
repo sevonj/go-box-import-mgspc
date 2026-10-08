@@ -4,11 +4,11 @@ use crate::gobox_types::PropSpawnDef;
 use crate::gobox_types::PropStaticDef;
 use crate::gobox_types::StageDef;
 use crate::gobox_types::{Coll, PropStaticBrkDef};
-use crate::intermediary_mesh::IntermediaryMatData;
 use crate::intermediary_mesh::IntermediaryMesh;
 use crate::intermediary_mesh::IntermediarySurf;
 use crate::intermediary_mesh::IntermediaryTexInfo;
 use crate::intermediary_mesh::MatTranspMode;
+use crate::intermediary_mesh::{IntermediaryMatData, IntermediaryScene};
 use crate::mgs_types::Darchive;
 use crate::mgs_types::Kmd;
 use crate::stage_info::*;
@@ -22,15 +22,16 @@ use std::path::Path;
 use zip::ZipArchive;
 
 pub struct TempRoomData {
+    pub name: &'static str,
     pub static_mesh: IntermediaryMesh,
     pub static_coll_mesh: IntermediaryMesh,
-    pub objects: Vec<TempLooseModelData>,
+    pub loose_models: Vec<TempLooseModelData>,
 }
 
 #[derive(Debug)]
 pub struct TempLooseModelData {
     pub name: String,
-    pub mesh: IntermediaryMesh,
+    pub scene: IntermediaryScene,
     pub coll: Coll,
     pub prop_def: TempPropDefEnum,
 }
@@ -87,38 +88,40 @@ pub fn gobox_import(game_dir: &Path, out_path: &Path) {
         .map(|r| get_a_room(&mut stage_zip, r, &out_temp_path))
         .collect();
 
-    let mut world_mesh = IntermediaryMesh::empty();
+    let mut world_scene = IntermediaryScene::empty();
     let mut world_coll_mesh = IntermediaryMesh::empty();
     for room in &rooms {
-        world_mesh = world_mesh.join(&room.static_mesh);
+        assert!(!world_scene.meshes.contains_key(room.name));
+        world_scene
+            .meshes
+            .insert(room.name.to_owned(), room.static_mesh.clone());
         world_coll_mesh = world_coll_mesh.join(&room.static_coll_mesh);
     }
-    world_mesh
-        .surfaces
-        .values_mut()
-        .for_each(|surf| surf.dedupe());
-
-    for surf in world_mesh.surfaces.values_mut() {
-        place_texture(surf, &out_textures_path);
+    for mesh in world_scene.meshes.values_mut() {
+        for surf in mesh.surfaces.values_mut() {
+            surf.dedupe();
+            place_texture(surf, &out_textures_path);
+        }
     }
-
     let stage_glb_path = out_models_path.join("stage.glb");
-    std::fs::write(&stage_glb_path, world_mesh.to_glb()).unwrap();
+    std::fs::write(&stage_glb_path, world_scene.to_glb()).unwrap();
 
     let stage_coll_path = stage_glb_path.with_extension("coll");
     std::fs::write(&stage_coll_path, world_coll_mesh.to_coll().to_bytes()).unwrap();
 
     for room in &rooms {
-        for loose_model in &room.objects {
-            for surf in loose_model.mesh.surfaces.values() {
-                place_texture(surf, &out_textures_path);
+        for loose_model in &room.loose_models {
+            for mesh in loose_model.scene.meshes.values() {
+                for surf in mesh.surfaces.values() {
+                    place_texture(surf, &out_textures_path);
+                }
             }
 
             let glb_path = out_models_path
                 .join(&loose_model.name)
                 .with_extension("glb");
             assert!(!glb_path.exists());
-            std::fs::write(&glb_path, loose_model.mesh.to_glb()).unwrap();
+            std::fs::write(&glb_path, loose_model.scene.to_glb()).unwrap();
 
             let coll_path = glb_path.with_extension("coll");
             assert!(!coll_path.exists());
@@ -309,17 +312,18 @@ fn get_a_room(
         };
 
         loose_models.push(TempLooseModelData {
-            name,
-            mesh,
+            name: name.clone(),
+            scene: IntermediaryScene::single(name, mesh),
             coll,
             prop_def: def,
         })
     }
 
     TempRoomData {
+        name: room_info.name,
         static_mesh,
         static_coll_mesh,
-        objects: loose_models,
+        loose_models,
     }
 }
 

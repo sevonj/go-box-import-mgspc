@@ -6,6 +6,25 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
+pub struct IntermediaryScene {
+    pub meshes: HashMap<String, IntermediaryMesh>,
+}
+
+impl IntermediaryScene {
+    pub fn empty() -> Self {
+        Self {
+            meshes: HashMap::new(),
+        }
+    }
+
+    pub fn single(name: String, mesh: IntermediaryMesh) -> Self {
+        Self {
+            meshes: HashMap::from([(name, mesh)]),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct IntermediaryMesh {
     pub origin: Vec3,
     /// Key includes folder name because the hash alone results in collision hell
@@ -326,8 +345,10 @@ pub struct IntermediaryTexInfo {
 }
 
 mod to_gltf {
+    use crate::intermediary_mesh::IntermediaryMatData;
     use crate::intermediary_mesh::IntermediaryMesh;
-    use crate::intermediary_mesh::{IntermediaryMatData, MatTranspMode};
+    use crate::intermediary_mesh::IntermediaryScene;
+    use crate::intermediary_mesh::MatTranspMode;
     use glam::DVec3;
     use glam::Vec2;
     use glam::Vec3;
@@ -353,7 +374,8 @@ mod to_gltf {
     use gltf::json::material::PbrMetallicRoughness;
     use gltf::json::material::StrengthFactor;
     use gltf::json::mesh::Primitive;
-    use gltf::json::texture::{Info, Sampler};
+    use gltf::json::texture::Info;
+    use gltf::json::texture::Sampler;
     use gltf::json::validation::Checked;
     use gltf::mesh::Mode;
     use gltf::texture::MagFilter;
@@ -372,7 +394,7 @@ mod to_gltf {
         material: IntermediaryMatData,
     }
 
-    impl IntermediaryMesh {
+    impl IntermediaryScene {
         pub fn to_glb(&self) -> Vec<u8> {
             {
                 let mut positions: Vec<Vec3> = vec![];
@@ -381,24 +403,28 @@ mod to_gltf {
                 let mut indices: Vec<u32> = vec![];
 
                 let mut temp_meshes: Vec<Vec<TempPrim>> = vec![];
+                let mut mesh_origins: Vec<Vec3> = vec![];
+                let mut mesh_names: Vec<&str> = vec![];
 
-                for surf in self.surfaces.values() {
+                for (name, mesh) in &self.meshes {
                     let mut temp_prims: Vec<TempPrim> = vec![];
+                    for surf in mesh.surfaces.values() {
+                        temp_prims.push(TempPrim {
+                            base_vertex: positions.len(),
+                            num_vertices: surf.positions.len(),
+                            base_index: indices.len(),
+                            num_indices: surf.indices.len(),
+                            material: surf.material.clone(),
+                        });
 
-                    temp_prims.push(TempPrim {
-                        base_vertex: positions.len(),
-                        num_vertices: surf.positions.len(),
-                        base_index: indices.len(),
-                        num_indices: surf.indices.len(),
-                        material: surf.material.clone(),
-                    });
-
-                    positions.extend(&surf.positions);
-                    normals.extend(&surf.normals);
-                    uvs.extend(&surf.uvs);
-                    indices.extend(&surf.indices);
-
+                        positions.extend(&surf.positions);
+                        normals.extend(&surf.normals);
+                        uvs.extend(&surf.uvs);
+                        indices.extend(&surf.indices);
+                    }
                     temp_meshes.push(temp_prims);
+                    mesh_origins.push(mesh.origin);
+                    mesh_names.push(name);
                 }
 
                 let mut bin: Vec<u8> = vec![];
@@ -619,15 +645,15 @@ mod to_gltf {
                     let mesh_json_idx = meshes.len() as u32;
                     meshes.push(Mesh {
                         primitives,
-                        name: Some(format!("mesh_{}", mesh_idx)),
+                        name: Some(String::from(mesh_names[mesh_idx])),
                         weights: None,
                         extensions: None,
                         extras: Void::default(),
                     });
                     nodes.push(Node {
                         mesh: Some(Index::new(mesh_json_idx)),
-                        name: Some(format!("node_{}", mesh_idx)),
-                        translation: Some(self.origin.to_array()),
+                        name: Some(String::from(mesh_names[mesh_idx])),
+                        translation: Some(mesh_origins[mesh_idx].to_array()),
                         ..Default::default()
                     });
                 }
