@@ -15,5 +15,7 @@ gltf-json = { version = "1.4.1", features = ["KHR_materials_unlit"] }
 image = "0.25.10"
 image-extras = "0.1" #{ version = "0.1", features = ["pcx"], default-features = false }
 json = "0.12.4"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
 wit-bindgen = "0.57.1"
 zip = "8.6.0"

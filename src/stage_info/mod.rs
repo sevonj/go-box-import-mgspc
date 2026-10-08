@@ -2,6 +2,7 @@ mod s08a;
 mod s08b;
 mod s08c;
 
+use crate::gobox_types::PropSpawnDef;
 use glam::Vec3;
 use s08a::*;
 use s08b::*;
@@ -34,6 +35,7 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
             y: -25.0,
             z: -1.0,
         },
+        prop_spawns: &[],
     },
     // helipad
     MgsRoomInfo {
@@ -51,6 +53,7 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
             y: 0.0,
             z: -50.0,
         },
+        prop_spawns: &[],
     },
     // tank hangar
     MgsRoomInfo {
@@ -88,6 +91,7 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
             y: 0.0,
             z: -84.0,
         },
+        prop_spawns: &[],
     },
     // brig
     MgsRoomInfo {
@@ -112,6 +116,7 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
             y: -10.0,
             z: -86.0,
         },
+        prop_spawns: &[],
     },
     // giant electric machine torture room that exists there for some reason ???
     MgsRoomInfo {
@@ -133,6 +138,7 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
             y: -10.0,
             z: -86.0,
         },
+        prop_spawns: &[],
     },
     // storage closets and trapdoors
     MgsRoomInfo {
@@ -172,6 +178,7 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
             y: -20.0,
             z: -86.5,
         },
+        prop_spawns: &[],
     },
     // AT prez / ocelot boss
     MgsRoomInfo {
@@ -195,6 +202,7 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
             y: -20.0,
             z: -70.0,
         },
+        prop_spawns: &[],
     },
     // raven tank battle
     MgsRoomInfo {
@@ -215,6 +223,7 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
             y: -0.0,
             z: -130.0,
         },
+        prop_spawns: &[],
     },
     // nuke storage
     MgsRoomInfo {
@@ -231,6 +240,7 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
         objects: &[],
         seal_model: Some(include_bytes!("../../extra-data/room_seals/seal_06a.glb")),
         origin: NUKE_BLDG_OFFSET,
+        prop_spawns: &[],
     },
     // toilet floor
     MgsRoomInfo {
@@ -272,6 +282,7 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
             y: NUKE_BLDG_OFFSET.y - 10.0,
             z: NUKE_BLDG_OFFSET.z - 9.765625,
         },
+        prop_spawns: &[],
     },
     // admin office
     MgsRoomInfo {
@@ -306,6 +317,7 @@ pub const ROOMS: &'static [MgsRoomInfo] = &[
             y: NUKE_BLDG_OFFSET.y - 10.0,
             z: NUKE_BLDG_OFFSET.z - 43.7012,
         },
+        prop_spawns: &[],
     },
     // Electric Floor Gas Chamber
     ROOM_S08A,
@@ -318,9 +330,10 @@ pub struct MgsRoomInfo {
     pub tex_paks: &'static [&'static str],
     pub mdl_paks: &'static [&'static str],
     pub static_geom: &'static [RoomStaticInfo],
-    pub objects: &'static [RoomObjInfo],
+    pub objects: &'static [MgsObjectInfo],
     pub seal_model: Option<&'static [u8]>,
     pub origin: Vec3,
+    pub prop_spawns: &'static [SPropSpawnDef],
 }
 
 pub struct RoomStaticInfo {
@@ -343,21 +356,29 @@ impl RoomStaticInfo {
     }
 }
 
-pub struct RoomObjInfo {
+pub enum GenerateProp {
+    Dont,
+    Static,
+    StaticBrk { dstr: &'static str },
+}
+
+pub struct MgsObjectInfo {
     pub kmd_filename: &'static str,
     pub name: &'static str,
     pub desc: &'static str,
     pub meshes_filter: Option<&'static [usize]>,
     pub coll_meshes_filter: Option<&'static [usize]>,
+    pub generate_prop: GenerateProp,
 }
 
-impl RoomObjInfo {
+impl MgsObjectInfo {
     pub const fn new(
         kmd_filename: &'static str,
         name: &'static str,
         desc: &'static str,
         meshes_filter: Option<&'static [usize]>,
         coll_meshes_filter: Option<&'static [usize]>,
+        generate_prop: GenerateProp,
     ) -> Self {
         Self {
             kmd_filename,
@@ -365,6 +386,23 @@ impl RoomObjInfo {
             desc,
             meshes_filter,
             coll_meshes_filter,
+            generate_prop,
+        }
+    }
+}
+
+pub struct SPropSpawnDef {
+    pub prop_id: &'static str,
+    pub position: [f32; 3],
+    pub rotation: [f32; 3],
+}
+
+impl Into<PropSpawnDef> for &SPropSpawnDef {
+    fn into(self) -> PropSpawnDef {
+        PropSpawnDef {
+            id: format!("mgsimport.{}", self.prop_id),
+            position: self.position,
+            rotation: self.rotation,
         }
     }
 }

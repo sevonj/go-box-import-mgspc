@@ -1,9 +1,14 @@
 use crate::error::MgsError;
-use crate::gobox_types::Coll;
+use crate::gobox_types::ContentPak;
+use crate::gobox_types::PropSpawnDef;
+use crate::gobox_types::PropStaticDef;
+use crate::gobox_types::StageDef;
+use crate::gobox_types::{Coll, PropStaticBrkDef};
+use crate::intermediary_mesh::IntermediaryMatData;
 use crate::intermediary_mesh::IntermediaryMesh;
+use crate::intermediary_mesh::IntermediarySurf;
 use crate::intermediary_mesh::IntermediaryTexInfo;
 use crate::intermediary_mesh::MatTranspMode;
-use crate::intermediary_mesh::{IntermediaryMatData, IntermediarySurf};
 use crate::mgs_types::Darchive;
 use crate::mgs_types::Kmd;
 use crate::stage_info::*;
@@ -19,40 +24,63 @@ use zip::ZipArchive;
 pub struct TempRoomData {
     pub static_mesh: IntermediaryMesh,
     pub static_coll_mesh: IntermediaryMesh,
-    pub objects: Vec<TempObjectData>,
+    pub objects: Vec<TempLooseModelData>,
 }
 
 #[derive(Debug)]
-pub struct TempObjectData {
+pub struct TempLooseModelData {
     pub name: String,
     pub mesh: IntermediaryMesh,
     pub coll: Coll,
+    pub prop_def: TempPropDefEnum,
+}
+
+#[derive(Debug)]
+enum TempPropDefEnum {
+    None,
+    Static(PropStaticDef),
+    StaticBrk(PropStaticBrkDef),
 }
 
 pub fn gobox_import(game_dir: &Path, out_path: &Path) {
     let _ = std::fs::remove_dir_all(out_path);
     let mut stage_zip = ZipArchive::new(File::open(game_dir.join("stage.mgz")).unwrap()).unwrap();
 
+    std::fs::create_dir_all(&out_path).unwrap();
+    std::fs::write(out_path.join(".gdignore"), []).unwrap();
+    std::fs::write(out_path.join(".gitignore"), "*\n".as_bytes()).unwrap();
+
     let out_temp_path = out_path.join("temp");
     let out_models_path = out_path.join("models");
     let out_textures_path = out_path.join("textures");
     let out_stage_path = out_path.join("stages").join("shadmo");
+    let out_props_path = out_path.join("props");
 
     std::fs::create_dir_all(&out_temp_path).unwrap();
     std::fs::create_dir_all(&out_models_path).unwrap();
     std::fs::create_dir_all(&out_textures_path).unwrap();
     std::fs::create_dir_all(&out_stage_path).unwrap();
+    std::fs::create_dir_all(&out_props_path).unwrap();
 
-    File::create(out_path.join(".gdignore")).unwrap();
-    File::create(out_path.join("manifest.json"))
-        .unwrap()
-        .write_all(include_str!("../extra-data/manifest.json").as_bytes())
-        .unwrap();
+    let mut pak = ContentPak {
+        stages: vec![String::from("shadmo")],
+        props_static: vec![],
+        props_static_brk: vec![],
+    };
 
-    File::create(out_stage_path.join("manifest.json"))
-        .unwrap()
-        .write_all(include_str!("../extra-data/stages/shadmo/manifest.json").as_bytes())
-        .unwrap();
+    let mut stage_def = StageDef {
+        id: String::from("mgsimport.shadmo"),
+        version: 1,
+        external: true,
+        name: String::from("Shadow Moses Island"),
+        description: String::from("Imported from Metal Gear Solid"),
+        thumbnail_path: String::from("mgsimport/textures/m3r_path_door1.png"),
+        model_path: String::from("mgsimport/models/stage.glb"),
+        coll_path: String::from("mgsimport/models/stage.coll"),
+        player_start_position: [-17.5, -25.0, -6.0],
+        player_start_rotation: [0.0, 0.0, 0.0],
+        props_static: vec![],
+    };
 
     let rooms: Vec<TempRoomData> = ROOMS
         .iter()
@@ -81,20 +109,61 @@ pub fn gobox_import(game_dir: &Path, out_path: &Path) {
     std::fs::write(&stage_coll_path, world_coll_mesh.to_coll().to_bytes()).unwrap();
 
     for room in &rooms {
-        for object in &room.objects {
-            for surf in object.mesh.surfaces.values() {
+        for loose_model in &room.objects {
+            for surf in loose_model.mesh.surfaces.values() {
                 place_texture(surf, &out_textures_path);
             }
 
-            let glb_path = out_models_path.join(&object.name).with_extension("glb");
+            let glb_path = out_models_path
+                .join(&loose_model.name)
+                .with_extension("glb");
             assert!(!glb_path.exists());
-            std::fs::write(&glb_path, object.mesh.to_glb()).unwrap();
+            std::fs::write(&glb_path, loose_model.mesh.to_glb()).unwrap();
 
             let coll_path = glb_path.with_extension("coll");
             assert!(!coll_path.exists());
-            std::fs::write(&coll_path, object.coll.to_bytes()).unwrap();
+            std::fs::write(&coll_path, loose_model.coll.to_bytes()).unwrap();
+
+            let def_path = out_props_path
+                .join(&loose_model.name)
+                .with_extension("json");
+            assert!(!def_path.exists());
+
+            match &loose_model.prop_def {
+                TempPropDefEnum::None => continue,
+                TempPropDefEnum::Static(def) => {
+                    std::fs::write(def_path, serde_json::to_string(def).unwrap().as_bytes())
+                        .unwrap();
+                    pak.props_static.push(loose_model.name.clone());
+                }
+                TempPropDefEnum::StaticBrk(def) => {
+                    std::fs::write(def_path, serde_json::to_string(def).unwrap().as_bytes())
+                        .unwrap();
+                    pak.props_static_brk.push(loose_model.name.clone());
+                }
+            }
         }
     }
+
+    for room in ROOMS {
+        for spawn in room.prop_spawns {
+            let mut spawn: PropSpawnDef = spawn.into();
+            spawn.position[0] += room.origin.x;
+            spawn.position[1] += room.origin.y;
+            spawn.position[2] += room.origin.z;
+            stage_def.props_static.push(spawn);
+        }
+    }
+
+    File::create(out_stage_path.join("stage.json"))
+        .unwrap()
+        .write_all(serde_json::to_string(&stage_def).unwrap().as_bytes())
+        .unwrap();
+
+    File::create(out_path.join("pak.json"))
+        .unwrap()
+        .write_all(serde_json::to_string(&pak).unwrap().as_bytes())
+        .unwrap();
 }
 
 fn get_a_room(
@@ -181,7 +250,7 @@ fn get_a_room(
         static_mesh = static_mesh.join(&IntermediaryMesh::from_seal_glb(glb, room_info.origin));
     }
 
-    let mut objects = Vec::new();
+    let mut loose_models = Vec::new();
     for obj_info in room_info.objects {
         let name = obj_info.name.to_owned();
         let kmd = models
@@ -219,13 +288,38 @@ fn get_a_room(
         };
         let coll = coll_mesh.to_coll();
 
-        objects.push(TempObjectData { name, mesh, coll })
+        let def = match obj_info.generate_prop {
+            GenerateProp::Dont => TempPropDefEnum::None,
+            GenerateProp::Static => TempPropDefEnum::Static(PropStaticDef {
+                id: format!("mgsimport.{name}"),
+                name: name.clone(),
+                description: obj_info.desc.to_owned(),
+                model_path: format!("mgsimport/models/{name}.glb"),
+                coll_path: format!("mgsimport/models/{name}.coll"),
+            }),
+            GenerateProp::StaticBrk { dstr } => TempPropDefEnum::StaticBrk(PropStaticBrkDef {
+                id: format!("mgsimport.{name}"),
+                name: name.clone(),
+                description: obj_info.desc.to_owned(),
+                model_path: format!("mgsimport/models/{name}.glb"),
+                coll_path: format!("mgsimport/models/{name}.coll"),
+                model_destroy_path: format!("mgsimport/models/{dstr}.glb"),
+                coll_destroy_path: format!("mgsimport/models/{dstr}.coll"),
+            }),
+        };
+
+        loose_models.push(TempLooseModelData {
+            name,
+            mesh,
+            coll,
+            prop_def: def,
+        })
     }
 
     TempRoomData {
         static_mesh,
         static_coll_mesh,
-        objects,
+        objects: loose_models,
     }
 }
 

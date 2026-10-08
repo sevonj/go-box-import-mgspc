@@ -1,7 +1,7 @@
-use crate::stage_info::MgsRoomInfo;
+use crate::stage_info::MgsObjectInfo;
 use crate::stage_info::NUKE_BLDG_OFFSET;
-use crate::stage_info::RoomObjInfo;
 use crate::stage_info::RoomStaticInfo;
+use crate::stage_info::{GenerateProp, MgsRoomInfo};
 use glam::Vec3;
 
 pub const ROOM_S08A: MgsRoomInfo = MgsRoomInfo {
@@ -150,10 +150,24 @@ pub const ROOM_S08A: MgsRoomInfo = MgsRoomInfo {
     ],
     objects: &[
         // --- named
-        RoomObjInfo::new("gca_arm.kmd", "gca_arm", "Gun camera arm", None, None),
-        RoomObjInfo::new("gca_gun.kmd", "gca_gun", "Gun camera", None, None),
+        MgsObjectInfo::new(
+            "gca_arm.kmd",
+            "gca_arm",
+            "Gun camera arm",
+            None,
+            None,
+            GenerateProp::Static,
+        ),
+        MgsObjectInfo::new(
+            "gca_gun.kmd",
+            "gca_gun",
+            "Gun camera",
+            None,
+            None,
+            GenerateProp::Static,
+        ),
         // --- misc
-        RoomObjInfo::new(
+        MgsObjectInfo::new(
             "08a_o1a.kmd",
             "08a_o1a",
             "Electrical cabinet",
@@ -164,13 +178,15 @@ pub const ROOM_S08A: MgsRoomInfo = MgsRoomInfo {
             },*/
             None,
             None,
+            GenerateProp::StaticBrk { dstr: "08a_o1b" },
         ),
-        RoomObjInfo::new(
+        MgsObjectInfo::new(
             "08a_o1b.kmd",
             "08a_o1b",
             "Electrical cabinet (destroyed)",
             None,
             None,
+            GenerateProp::Dont,
         ),
     ],
     seal_model: Some(include_bytes!("../../extra-data/room_seals/seal_08a.glb")),
@@ -180,4 +196,5 @@ pub const ROOM_S08A: MgsRoomInfo = MgsRoomInfo {
         y: NUKE_BLDG_OFFSET.y - 20.0,
         z: NUKE_BLDG_OFFSET.z - 5.37109,
     },
+    prop_spawns: &[],
 };

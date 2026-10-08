@@ -1,6 +1,6 @@
 use crate::stage_info::MgsRoomInfo;
 use crate::stage_info::NUKE_BLDG_OFFSET;
-use crate::stage_info::RoomObjInfo;
+use crate::stage_info::MgsObjectInfo;
 use crate::stage_info::RoomStaticInfo;
 use glam::Vec3;
 
@@ -84,4 +84,5 @@ pub const ROOM_S08C: MgsRoomInfo = MgsRoomInfo {
         y: NUKE_BLDG_OFFSET.y - 20.0,
         z: NUKE_BLDG_OFFSET.z - 3.90725,
     },
+    prop_spawns: &[]
 };
